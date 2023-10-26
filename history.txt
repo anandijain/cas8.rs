@@ -1,0 +1,31 @@
+#V2
+("hi" "hi")
+(1 2 "hi")
+(3.5 1 "hi")
+-3
+-3.5
+x
+MyPackage`foo
+x
+(f x)
+(1 2 3)
+()
+(a)
+Plus
+(Plus 1 1)
+(a b c)
+(Plus 1 1)
+(MatchQ x x)
+(MatchQ (a) (Blank))
+(Plus 1 1)
+(MatchQ x x)
+(MatchQ x (Blank))
+(Head 1)
+(Head 1.5)
+(MatchQ x x)
+(MatchQ (f a b c) (f a b c))
+(MatchQ (f a b c) (f a b (Blank)))
+(MatchQ (f x) (Blank f))
+(MatchQ (f x) (Blank h))
+(MatchQ 1 (Blank Int))
+(MatchQ 1 (Blank Integer))
