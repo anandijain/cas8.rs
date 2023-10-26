@@ -302,7 +302,12 @@ fn evaluate(ctx: &mut Context2, ex: Expr) -> Expr {
 }
 
 /// todo add an offset argument as a flag for whether to use the offset or not
-fn pos_map_rebuild(pos: Vec<usize>, pat: Expr, pos_map: &HashMap<Vec<usize>, Expr>) -> Expr {
+fn pos_map_rebuild(
+    pos: Vec<usize>,
+    pat: Expr,
+    pos_map: &HashMap<Vec<usize>, Expr>,
+    use_offset: bool,
+) -> Expr {
     if let Some(replacement) = pos_map.get(&pos) {
         return replacement.clone();
     }
@@ -314,13 +319,25 @@ fn pos_map_rebuild(pos: Vec<usize>, pat: Expr, pos_map: &HashMap<Vec<usize>, Exp
             // we need to rebuild the head separately since ExprKind::Normal keeps them separate
             let mut new_pos = pos.clone();
             new_pos.push(0);
-            let new_eh = pos_map_rebuild(new_pos, es.head().clone(), pos_map);
+            let new_eh = pos_map_rebuild(new_pos, es.head().clone(), pos_map, use_offset);
             new_es.push(new_eh);
+            let mut offset: isize = 0;
 
             for (i, e) in es.elements().iter().enumerate() {
                 let mut new_pos = pos.clone();
-                new_pos.push(i + 1);
-                let new_e = pos_map_rebuild(new_pos, e.clone(), pos_map);
+                let pos_in_list = if use_offset {
+                    i as isize + 1 + offset
+                } else {
+                    i as isize + 1
+                };
+                new_pos.push(pos_in_list as usize);
+                let new_e = pos_map_rebuild(new_pos, e.clone(), pos_map, use_offset);
+                if let ExprKind::Normal(n) = new_e.kind() {
+                    if n.head() == &syme("System`Sequence") {
+                        offset += n.elements().len() as isize - 1;
+                    }
+                }
+
                 new_es.push(new_e);
             }
             Expr::normal(new_es[0].clone(), new_es[1..].to_vec())
@@ -367,7 +384,7 @@ fn rebuild_and_splice(
     named_map: &HashMap<Expr, Expr>,
     use_offset: bool,
 ) -> Expr {
-    let mut new_pat = pos_map_rebuild(pos.clone(), pat.clone(), pos_map);
+    let mut new_pat = pos_map_rebuild(pos.clone(), pat.clone(), pos_map, use_offset);
     new_pat = splice_sequences(new_pat);
     new_pat
 }
