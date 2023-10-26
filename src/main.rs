@@ -412,7 +412,7 @@ fn my_match(
                         // j represents the number of elements in the matched Sequence
                         // which is why we start with 1 for BLANK_SEQ and 0 for BLANK_NULL_SEQ
                         for j in 1..=ees.len() {
-                            let mut elts = vec![syme("Sequence")];
+                            let mut elts = vec![syme("System`Sequence")];
                             // now we build up the elements of the Sequence
                             // which start at index i and go to i+j
 
@@ -460,7 +460,7 @@ fn my_match(
                     }
                     // }
                 } else {
-                if !my_match(
+                    if !my_match(
                         ctx,
                         e.elements()[i].clone(),
                         pi.clone(),
@@ -471,18 +471,14 @@ fn my_match(
                         break 'outer;
                     }
                 }
-
             } // 'outer
 
-            // for (i, (ei, pi)) in ees.iter().zip(pes).enumerate() {
-            //     let mut new_pos = pos.clone();
-            //     new_pos.push(i + 1);
-            //     if !my_match(ctx, ei.clone(), pi.clone(), &new_pos, pos_map, named_map) {
-            //         return false;
-            //     }
-            // }
-
-            true
+            let final_pat = rebuild_and_splice(pat.clone(), &pos, pos_map, named_map, true);
+            println!("final comparison: POS: {pos:?} | PAT: {pat} | NEW_PAT: {final_pat} | EX: {ex} || pos {pos_map:?} || named {named_map:?}");
+            if final_pat == ex {
+                return true;
+            }
+            false
         }
         (_, ExprKind::Normal(p)) => {
             if BLANK_SYMS.contains(&p.head()) {

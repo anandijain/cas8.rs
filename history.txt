@@ -29,3 +29,5 @@ Plus
 (MatchQ (f x) (Blank h))
 (MatchQ 1 (Blank Int))
 (MatchQ 1 (Blank Integer))
+(MatchQ (f a b c) (f (BlankSequence)))
+(MatchQ (f (a b) (a c) (a d)) (f (BlankSequence a)))
