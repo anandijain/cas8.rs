@@ -357,63 +357,25 @@ fn pos_map_rebuild(
     }
 }
 
-fn pos_map_rebuild2(
-    pos: Vec<usize>,
-    pat: Expr,
-    pos_map: &mut HashMap<Vec<usize>, Vec<Expr>>,
-    use_offset: bool,
-) -> Expr {
-    println!(
-        "pos_map_rebuild2: {pos:?} | {pat} | {pos_map:?} | {use_offset}",
-        pos = pos,
-        pat = pat,
-        pos_map = pos_map,
-        use_offset = use_offset
-    );
-    if let Some(mut replacements) = pos_map.get_mut(&pos) {
-        if let Some(replacement) = replacements.pop() {
-            // Remove the applied replacement from the map if it's empty
-            if replacements.is_empty() {
-                pos_map.remove(&pos);
-            }
-            return replacement;
-        }
+fn named_rebuild_all(expr: Expr, map: &HashMap<Expr, Expr>) -> Expr {
+    // First, check if the entire expression exists in the map and replace it if it does
+    if let Some(replacement) = map.get(&expr) {
+        return replacement.clone();
     }
 
-    match pat.kind() {
-        ExprKind::Normal(es) => {
-            let mut new_es = vec![];
-
-            // rebuild the head separately since ExprKind::Normal keeps them separate
-            let mut new_pos = pos.clone();
-            new_pos.push(0);
-            let new_eh = pos_map_rebuild2(new_pos, es.head().clone(), pos_map, use_offset);
-            new_es.push(new_eh);
-            let mut offset: isize = 0;
-
-            for (i, e) in es.elements().iter().enumerate() {
-                let mut new_pos = pos.clone();
-                let pos_in_list = if use_offset {
-                    i as isize + 1 + offset
-                } else {
-                    i as isize + 1
-                };
-                new_pos.push(pos_in_list as usize);
-                // so here we want to splice (Sequence)
-                let new_e = pos_map_rebuild2(new_pos, e.clone(), pos_map, use_offset);
-
-                // new_e = (Sequence)
-                if let ExprKind::Normal(n) = new_e.kind() {
-                    if n.head() == &syme("System`Sequence") {
-                        offset += n.elements().len() as isize - 1;
-                    }
-                }
-
-                new_es.push(new_e);
-            }
-            Expr::normal(new_es[0].clone(), new_es[1..].to_vec())
+    // If the expression is not in the map, proceed with the recursion
+    match expr.kind() {
+        ExprKind::Normal(list) => {
+            let (lh, es) = (list.head(), list.elements());
+            let nh = named_rebuild_all(lh.clone(), map);
+            // Recursively rebuild all sub-expressions in the list
+            let new_list: Vec<Expr> = es
+                .into_iter()
+                .map(|e| named_rebuild_all(e.clone(), map))
+                .collect();
+            Expr::normal(nh, new_list)
         }
-        _ => pat,
+        _ => expr,
     }
 }
 
@@ -452,18 +414,6 @@ fn splice_sequences(expr: Expr, use_offset: bool) -> Expr {
     }
 }
 
-// fn rebuild_and_splice2(
-//     pat: Expr,
-//     pos: &Vec<usize>,
-//     pos_map: &mut HashMap<Vec<usize>, Vec<Expr>>,
-//     named_map: &HashMap<Expr, Expr>,
-//     use_offset: bool,
-// ) -> Expr {
-//     let mut new_pat = pos_map_rebuild2(pos.clone(), pat.clone(), pos_map, use_offset);
-//     new_pat = splice_sequences(new_pat);
-//     new_pat
-// }
-
 fn rebuild_and_splice(
     pat: Expr,
     pos: &Vec<usize>,
@@ -473,6 +423,7 @@ fn rebuild_and_splice(
 ) -> Expr {
     let mut new_pat = pos_map_rebuild(pos.clone(), pat.clone(), pos_map, use_offset);
     println!("rebuild_and_splice: {pos:?} | {pat} newpat {new_pat} | {pos_map:?} | {named_map:?} | {use_offset}", pos = pos, pat = pat, pos_map = pos_map, named_map = named_map, use_offset = use_offset);
+    new_pat = named_rebuild_all(new_pat, named_map);
     new_pat = splice_sequences(new_pat, use_offset);
     println!("POST SPLICE {new_pat}");
     new_pat
@@ -568,14 +519,15 @@ fn my_match(
 
                                     for k in i..(i + j) {
                                         let seq_e = &ees[k - num_empty_bns];
-                                        if pn.elements().len() == 1 {
-                                            let b_head = &pies[0];
-                                            if b_head != &head(seq_e.clone()) {
+                                        // println!("seq_e {seq_e} | bnes {bnes}");
+                                        if bnes.len() == 1 {
+                                            if bnes[0] != head(seq_e.clone()) {
                                                 break;
                                             }
                                         }
                                         elts.push(seq_e.clone());
                                     }
+                                    
                                     let seq = Expr::normal(elts[0].clone(), elts[1..].to_vec());
                                     pos_map.insert(new_pos.clone(), seq.clone());
                                     named_map.insert(pi.clone(), seq.clone());
@@ -697,9 +649,14 @@ fn my_match(
                         panic!("something very wrong ");
                     }
                 } else {
+                    let eelts = e.elements();
+                    let ex_idx = i - num_empty_bns;
+                    if ex_idx >= eelts.len() {
+                        break 'outer;
+                    }
                     if !my_match(
                         ctx,
-                        e.elements()[i - num_empty_bns].clone(),
+                        eelts[ex_idx].clone(),
                         pi.clone(),
                         &new_pos,
                         pos_map,
@@ -766,8 +723,8 @@ fn main() -> Result<()> {
     println!("{:?}", pm);
     let ex = parse("(f (BlankNullSequence) (BlankSequence))");
 
-    let new = pos_map_rebuild2(vec![], ex, &mut pm, false);
-    println!("{}", new);
+    // let new = pos_map_rebuild2(vec![], ex, &mut pm, false);
+    // println!("{}", new);
     // pos_map_rebuild(vec![1], ex, pm, use_offset)
 
     // rebuild2(ex.clone(), &vec![1], &pm);
@@ -842,15 +799,26 @@ mod tests {
             ("(MatchQ (f x) (BlankNullSequence f))", parse("True")),
             ("(MatchQ (f x) (f x (BlankNullSequence)))", parse("True")),
             ("(MatchQ (f x) (BlankNullSequence))", parse("True")),
+
             //starting named 
             ("(MatchQ 1 (Pattern x (Blank)))", parse("True")),
             ("(MatchQ 1 (Pattern x (Blank Integer)))", parse("True")),
             ("(MatchQ (f x) (Pattern x (Blank)))", parse("True")),
             ("(MatchQ (f x) (Pattern x (Blank f)))", parse("True")),
 
-            // ("(MatchQ (f x x) (f (Pattern x (Blank)) (Pattern x (Blank))))", parse("True")),
-            // ("(MatchQ (f x y) (f (Pattern x (Blank)) (Pattern x (Blank))))", parse("False")),
-            // ("(MatchQ (f x) (f (BlankNullSequence) (BlankSequence)))", parse("True")),
+            ("(MatchQ (f x x) (f (Pattern x (Blank)) (Pattern x (Blank))))", parse("True")),
+            ("(MatchQ (f x y) (f (Pattern x (Blank)) (Pattern x (Blank))))", parse("False")),
+            ("(MatchQ (f (a b) (a c)) (f (Pattern x (BlankSequence a))))", parse("True")),
+            ("(MatchQ (f (a b) (a c)) (f (Pattern x (BlankSequence b))))", parse("False")),
+
+            // https://github.com/anandijain/cas3.rs/issues/18
+            ("(MatchQ (f a) (f (BlankNullSequence) (BlankSequence)))", parse("True")),
+            ("(MatchQ (f a) (f (Pattern x (BlankNullSequence)) (BlankSequence)))", parse("True")),
+            ("(MatchQ (f a) (f (Pattern x (BlankNullSequence)) (Pattern y (BlankSequence))))", parse("True")),
+            ("(MatchQ (f a b c d e) (f (BlankSequence) c (BlankSequence)))", parse("True")),
+
+            
+            ("(MatchQ (f a b c d e) (f (Pattern x (BlankSequence)) c (Pattern x (BlankSequence))))", parse("False")),
         ];
 
         for (i, (c, e)) in cases.iter().enumerate() {
