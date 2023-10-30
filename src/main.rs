@@ -26,14 +26,19 @@ use std::ops::{Deref, DerefMut};
 use std::time::{Duration, Instant};
 use std::{fmt, path::Path};
 
-use wolfram_expr::{Expr, ExprKind, Normal, Number, Symbol};
-// use wolfram_expr::ExprKind::Normal
+use wolfram_expr::{Expr, ExprKind, Symbol};
 
 lazy_static! {
     pub static ref BLANK: Expr = Expr::from(Symbol::new("System`Blank"));
     pub static ref BLANK_SEQ: Expr = Expr::from(Symbol::new("System`BlankSequence"));
     pub static ref BLANK_NULL_SEQ: Expr = Expr::from(Symbol::new("System`BlankNullSequence"));
+    pub static ref BLANK_SEQ_SYMS: Vec<&'static Expr> = vec![&*BLANK_SEQ, &*BLANK_NULL_SEQ];
     pub static ref BLANK_SYMS: Vec<&'static Expr> = vec![&*BLANK, &*BLANK_SEQ, &*BLANK_NULL_SEQ];
+    pub static ref PATTERN: Expr = Expr::from(Symbol::new("System`Pattern"));
+    pub static ref SEQUENCE: Expr = Expr::from(Symbol::new("System`Sequence"));
+    pub static ref MATCHQ: Expr = Expr::from(Symbol::new("System`MatchQ"));
+    pub static ref HEAD: Expr = Expr::from(Symbol::new("System`Head"));
+    pub static ref PLUS: Expr = Expr::from(Symbol::new("System`Plus"));
 }
 
 #[derive(Helper, Completer, Hinter, Validator)]
@@ -192,15 +197,15 @@ impl TableEntry {
 }
 
 pub fn internal_functions_apply(ctx: &mut Context2, ex: Expr) -> Expr {
-    println!("Applying {}", ex);
+    // println!("Applying {}", ex);
     if let ExprKind::Normal(n) = ex.kind() {
         let (h, es) = (n.head(), n.elements());
 
         if h == &Expr::symbol(Symbol::new("System`Plus")) {
-            println!("Plus");
+            // println!("Plus");
             if let (ExprKind::Integer(a), ExprKind::Integer(b)) = (es[0].kind(), es[1].kind()) {
                 let ret = Expr::from(a + b);
-                println!("Integers reutrning {}", ret);
+                // println!("Integers reutrning {}", ret);
                 return ret;
             }
             return ex.into();
@@ -330,8 +335,74 @@ fn pos_map_rebuild(
                 } else {
                     i as isize + 1
                 };
+                println!("iterating in pos_map_rebuild i: {i} | e: {e} | offset {offset}");
                 new_pos.push(pos_in_list as usize);
                 let new_e = pos_map_rebuild(new_pos, e.clone(), pos_map, use_offset);
+                if let ExprKind::Normal(n) = new_e.kind() {
+                    if n.head() == &syme("System`Sequence") {
+                        let ne = n.elements().len();
+                        // zero is because we special cased empty seqs to not splice
+                        if ne == 0 {
+                        } else {
+                            offset += n.elements().len() as isize - 1;
+                        }
+                    }
+                }
+
+                new_es.push(new_e);
+            }
+            Expr::normal(new_es[0].clone(), new_es[1..].to_vec())
+        }
+        _ => pat,
+    }
+}
+
+fn pos_map_rebuild2(
+    pos: Vec<usize>,
+    pat: Expr,
+    pos_map: &mut HashMap<Vec<usize>, Vec<Expr>>,
+    use_offset: bool,
+) -> Expr {
+    println!(
+        "pos_map_rebuild2: {pos:?} | {pat} | {pos_map:?} | {use_offset}",
+        pos = pos,
+        pat = pat,
+        pos_map = pos_map,
+        use_offset = use_offset
+    );
+    if let Some(mut replacements) = pos_map.get_mut(&pos) {
+        if let Some(replacement) = replacements.pop() {
+            // Remove the applied replacement from the map if it's empty
+            if replacements.is_empty() {
+                pos_map.remove(&pos);
+            }
+            return replacement;
+        }
+    }
+
+    match pat.kind() {
+        ExprKind::Normal(es) => {
+            let mut new_es = vec![];
+
+            // rebuild the head separately since ExprKind::Normal keeps them separate
+            let mut new_pos = pos.clone();
+            new_pos.push(0);
+            let new_eh = pos_map_rebuild2(new_pos, es.head().clone(), pos_map, use_offset);
+            new_es.push(new_eh);
+            let mut offset: isize = 0;
+
+            for (i, e) in es.elements().iter().enumerate() {
+                let mut new_pos = pos.clone();
+                let pos_in_list = if use_offset {
+                    i as isize + 1 + offset
+                } else {
+                    i as isize + 1
+                };
+                new_pos.push(pos_in_list as usize);
+                // so here we want to splice (Sequence)
+                let new_e = pos_map_rebuild2(new_pos, e.clone(), pos_map, use_offset);
+
+                // new_e = (Sequence)
                 if let ExprKind::Normal(n) = new_e.kind() {
                     if n.head() == &syme("System`Sequence") {
                         offset += n.elements().len() as isize - 1;
@@ -346,14 +417,14 @@ fn pos_map_rebuild(
     }
 }
 
-fn splice_sequences(expr: Expr) -> Expr {
+fn splice_sequences(expr: Expr, use_offset: bool) -> Expr {
     match expr.kind() {
         ExprKind::Normal(n) => {
             // in this version we assume that the head is not a Sequence
             let (h, es) = (n.head(), n.elements());
             let mut new_es = vec![];
             for e in es {
-                let new_e = splice_sequences(e.clone());
+                let new_e = splice_sequences(e.clone(), use_offset);
                 new_es.push(new_e);
             }
 
@@ -362,6 +433,10 @@ fn splice_sequences(expr: Expr) -> Expr {
                 if let ExprKind::Normal(n) = ne.kind() {
                     let (h, es) = (n.head(), n.elements());
                     if h == &sym("System`Sequence") {
+                        if !use_offset && es.is_empty() {
+                            new.push(ne);
+                            continue;
+                        }
                         // we need to splice the Sequence into the list
 
                         new.extend_from_slice(es);
@@ -377,6 +452,18 @@ fn splice_sequences(expr: Expr) -> Expr {
     }
 }
 
+// fn rebuild_and_splice2(
+//     pat: Expr,
+//     pos: &Vec<usize>,
+//     pos_map: &mut HashMap<Vec<usize>, Vec<Expr>>,
+//     named_map: &HashMap<Expr, Expr>,
+//     use_offset: bool,
+// ) -> Expr {
+//     let mut new_pat = pos_map_rebuild2(pos.clone(), pat.clone(), pos_map, use_offset);
+//     new_pat = splice_sequences(new_pat);
+//     new_pat
+// }
+
 fn rebuild_and_splice(
     pat: Expr,
     pos: &Vec<usize>,
@@ -385,9 +472,12 @@ fn rebuild_and_splice(
     use_offset: bool,
 ) -> Expr {
     let mut new_pat = pos_map_rebuild(pos.clone(), pat.clone(), pos_map, use_offset);
-    new_pat = splice_sequences(new_pat);
+    println!("rebuild_and_splice: {pos:?} | {pat} newpat {new_pat} | {pos_map:?} | {named_map:?} | {use_offset}", pos = pos, pat = pat, pos_map = pos_map, named_map = named_map, use_offset = use_offset);
+    new_pat = splice_sequences(new_pat, use_offset);
+    println!("POST SPLICE {new_pat}");
     new_pat
 }
+
 fn my_match(
     ctx: &mut Context2,
     ex: Expr,
@@ -410,6 +500,20 @@ fn my_match(
                 } else {
                     return false;
                 }
+            } else if ph == &*PATTERN {
+                let b = pes[1].clone();
+                if is_blank_match(ex.clone(), b) {
+                    if let Some(from_map) = named_map.get(&pat) {
+                        return from_map == &ex;
+                    } else {
+                        // doing both idk why
+                        named_map.insert(pat.clone(), ex.clone());
+                        pos_map.insert(pos.to_vec(), ex.clone());
+                        return true;
+                    }
+                } else {
+                    return false;
+                }
             }
 
             let mut new_pos = pos.clone();
@@ -419,34 +523,145 @@ fn my_match(
                 return false;
             }
 
+            let mut num_empty_bns = 0;
             'outer: for (i, pi) in pes.iter().enumerate() {
                 let ip1 = i + 1;
                 let mut new_pos = pos.clone();
                 new_pos.push(ip1);
-                if pi.normal_head() == Some(BLANK_SEQ.clone()) {
+
+                // here we do a check for empty sequence and skip
+                if let ExprKind::Normal(pn) = pi.kind() {
+                    // let pih = pn.head();
+                    let (pih, pies) = (pn.head(), pn.elements());
+
+                    if pih == &Expr::from(SEQUENCE.clone()) && pies.is_empty() {
+                        println!("found empty sequence at {new_pos:?}");
+                        num_empty_bns += 1;
+                        continue;
+                    }
+                }
+
+                let v = vec![Some(BLANK_SEQ.clone()), Some(BLANK_NULL_SEQ.clone())];
+                if pi.normal_head() == Some(PATTERN.clone()) {
                     if let ExprKind::Normal(pn) = pi.kind() {
                         let (pih, pies) = (pn.head(), pn.elements());
+                        let b = pies[1].clone();
+                        if let ExprKind::Normal(bn) = b.kind() {
+                            let (bnh, bnes) = (bn.head(), bn.elements());
+                            //
+                            if BLANK_SEQ_SYMS.contains(&bnh) {
+                                let bounds = if bnh == &*BLANK_SEQ {
+                                    1..=ees.len()
+                                } else {
+                                    0..=ees.len()
+                                };
+
+                                for j in bounds {
+                                    let mut elts = vec![syme("System`Sequence")];
+                                    // now we build up the elements of the Sequence
+                                    // which start at index i and go to i+j
+
+                                    if i + j - num_empty_bns > ees.len() {
+                                        println!("breaking news!");
+                                        break 'outer;
+                                    }
+
+                                    for k in i..(i + j) {
+                                        let seq_e = &ees[k - num_empty_bns];
+                                        if pn.elements().len() == 1 {
+                                            let b_head = &pies[0];
+                                            if b_head != &head(seq_e.clone()) {
+                                                break;
+                                            }
+                                        }
+                                        elts.push(seq_e.clone());
+                                    }
+                                    let seq = Expr::normal(elts[0].clone(), elts[1..].to_vec());
+                                    pos_map.insert(new_pos.clone(), seq.clone());
+                                    named_map.insert(pi.clone(), seq.clone());
+
+                                    // now that we have a potential solution for the Sequence matching
+                                    // we need to rebuild the pattern with the Sequence replaced and recurse
+                                    // to see if any subsequent patterns match
+                                    let new_pat = rebuild_and_splice(
+                                        pat.clone(),
+                                        &pos,
+                                        pos_map,
+                                        named_map,
+                                        false,
+                                    );
+                                    if bnh == &*BLANK_SEQ {
+                                        println!("new_pat in NAMED BS: seq: {seq} at iter {j} newpos {new_pos:?} {new_pat}");
+                                    } else {
+                                        println!("new_pat in NAMED BNS: seq: {seq} at iter {j} newpos {new_pos:?} {new_pat}");
+                                    }
+                                    let mut copy = pos_map.clone();
+                                    // this is to avoid double application of a pos rule
+                                    copy.remove(&new_pos);
+
+                                    // now we recurse with our "guess"
+                                    if my_match(ctx, ex.clone(), new_pat, pos, &mut copy, named_map)
+                                    {
+                                        pos_map.clear();
+                                        pos_map.extend(copy);
+
+                                        pos_map.insert(new_pos.clone(), seq.clone());
+
+                                        break 'outer;
+                                    } else {
+                                        // break 'outer;
+                                        // i think we need to revert pos_map to whatever it was before this my_match ctx, call
+                                    }
+                                }
+                            } else {
+                                if !my_match(
+                                    ctx,
+                                    e.elements()[i - num_empty_bns].clone(),
+                                    pi.clone(),
+                                    &new_pos,
+                                    pos_map,
+                                    named_map,
+                                ) {
+                                    break 'outer;
+                                }
+                            }
+                        } else {
+                            panic!("invalid patern. Blank needs to be Normal")
+                        }
+                    } else {
+                        panic!("something very wrong ");
+                    }
+                } else if v.contains(&pi.normal_head()) {
+                    if let ExprKind::Normal(pn) = pi.kind() {
+                        let (pih, pies) = (pn.head(), pn.elements());
+
                         // j represents the number of elements in the matched Sequence
                         // which is why we start with 1 for BLANK_SEQ and 0 for BLANK_NULL_SEQ
-                        for j in 1..=ees.len() {
+                        let bounds = if pih == &*BLANK_SEQ {
+                            1..=ees.len()
+                        } else {
+                            0..=ees.len()
+                        };
+
+                        for j in bounds {
                             let mut elts = vec![syme("System`Sequence")];
                             // now we build up the elements of the Sequence
                             // which start at index i and go to i+j
 
-                            if i + j > ees.len() {
+                            if i + j - num_empty_bns > ees.len() {
                                 println!("breaking news!");
                                 break 'outer;
                             }
 
                             for k in i..(i + j) {
-                                let seq_e = &ees[k];
+                                let seq_e = &ees[k - num_empty_bns];
                                 if pn.elements().len() == 1 {
                                     let b_head = &pies[0];
                                     if b_head != &head(seq_e.clone()) {
                                         break;
                                     }
                                 }
-                                elts.push(ees[k].clone());
+                                elts.push(seq_e.clone());
                             }
                             let seq = Expr::normal(elts[0].clone(), elts[1..].to_vec());
                             pos_map.insert(new_pos.clone(), seq.clone());
@@ -456,7 +671,11 @@ fn my_match(
                             // to see if any subsequent patterns match
                             let new_pat =
                                 rebuild_and_splice(pat.clone(), &pos, pos_map, named_map, false);
-                            println!("new_pat in bs: at iter {j} {new_pat}");
+                            if pih == &*BLANK_SEQ {
+                                println!("new_pat in BS: seq: {seq} at iter {j} newpos {new_pos:?} {new_pat}");
+                            } else {
+                                println!("new_pat in BNS: seq: {seq} at iter {j} newpos {new_pos:?} {new_pat}");
+                            }
                             let mut copy = pos_map.clone();
                             // this is to avoid double application of a pos rule
                             copy.remove(&new_pos);
@@ -474,12 +693,13 @@ fn my_match(
                                 // i think we need to revert pos_map to whatever it was before this my_match ctx, call
                             }
                         }
+                    } else {
+                        panic!("something very wrong ");
                     }
-                    // }
                 } else {
                     if !my_match(
                         ctx,
-                        e.elements()[i].clone(),
+                        e.elements()[i - num_empty_bns].clone(),
                         pi.clone(),
                         &new_pos,
                         pos_map,
@@ -498,10 +718,25 @@ fn my_match(
             false
         }
         (_, ExprKind::Normal(p)) => {
-            if BLANK_SYMS.contains(&p.head()) {
+            let (ph, pes) = (p.head(), p.elements());
+            if BLANK_SYMS.contains(&ph) {
                 if is_blank_match(ex.clone(), pat.clone()) {
                     pos_map.insert(pos.to_vec(), ex.clone());
                     return true;
+                } else {
+                    return false;
+                }
+            } else if ph == &*PATTERN {
+                let b = pes[1].clone();
+                if is_blank_match(ex.clone(), b) {
+                    if let Some(from_map) = named_map.get(&pat) {
+                        return from_map == &ex;
+                    } else {
+                        // doing both idk why
+                        named_map.insert(pat.clone(), ex.clone());
+                        pos_map.insert(pos.to_vec(), ex.clone());
+                        return true;
+                    }
                 } else {
                     return false;
                 }
@@ -522,10 +757,28 @@ fn main() -> Result<()> {
     // let v = vec![1];
     // println!("{} {:?}", e, v[1..].to_vec());
     let ex = parse("(f (Sequence a b c))");
-    let ex2 = splice_sequences(ex.clone());
-    println!("{}", ex);
-    println!("{}", ex2);
-    run(rl, &mut ctx)
+    // let ex2 = splice_sequences(ex.clone());
+    // println!("{}", ex);
+    // println!("{}", ex2);
+
+    let mut pm = HashMap::new();
+    pm.insert(vec![1], vec![parse("(Sequence a)"), parse("(Sequence)")]);
+    println!("{:?}", pm);
+    let ex = parse("(f (BlankNullSequence) (BlankSequence))");
+
+    let new = pos_map_rebuild2(vec![], ex, &mut pm, false);
+    println!("{}", new);
+    // pos_map_rebuild(vec![1], ex, pm, use_offset)
+
+    // rebuild2(ex.clone(), &vec![1], &pm);
+
+    // let mut hm = HashMap::new();
+    // hm.insert("Hello", "World");
+    // hm.insert("Hello", "Anand");
+    // println!("{:?}", hm);
+    run(rl, &mut ctx);
+
+    Ok(())
 }
 
 pub fn evalparse(s: &str) -> Expr {
@@ -585,10 +838,24 @@ mod tests {
             ("(MatchQ 1 (Blank Integer))", parse("True")),
             ("(MatchQ (f x) (Blank))", parse("True")),
             ("(MatchQ (f x) (Blank f))", parse("True")),
+            ("(MatchQ (f (a b) (a c) (a d) 0 (a e) (a f)) (f (BlankSequence a) 0 (BlankSequence a)))", parse("True")),
+            ("(MatchQ (f x) (BlankNullSequence f))", parse("True")),
+            ("(MatchQ (f x) (f x (BlankNullSequence)))", parse("True")),
+            ("(MatchQ (f x) (BlankNullSequence))", parse("True")),
+            //starting named 
+            ("(MatchQ 1 (Pattern x (Blank)))", parse("True")),
+            ("(MatchQ 1 (Pattern x (Blank Integer)))", parse("True")),
+            ("(MatchQ (f x) (Pattern x (Blank)))", parse("True")),
+            ("(MatchQ (f x) (Pattern x (Blank f)))", parse("True")),
+
+            // ("(MatchQ (f x x) (f (Pattern x (Blank)) (Pattern x (Blank))))", parse("True")),
+            // ("(MatchQ (f x y) (f (Pattern x (Blank)) (Pattern x (Blank))))", parse("False")),
+            // ("(MatchQ (f x) (f (BlankNullSequence) (BlankSequence)))", parse("True")),
         ];
 
-        for (c, e) in cases {
-            assert_eq!(ctx_evalparse(&mut ctx, c), e)
+        for (i, (c, e)) in cases.iter().enumerate() {
+            println!("STARTING MATCH CASE {}: {}", i, c);
+            assert_eq!(ctx_evalparse(&mut ctx, c), *e)
         }
     }
 
@@ -606,9 +873,9 @@ mod tests {
         // ];
 
         let ex = parse("(f (Sequence a b c))");
-        let ex2 = splice_sequences(ex.clone());
-        println!("{}", ex);
-        println!("{}", ex2);
+        // let ex2 = splice_sequences(ex.clone());
+        // println!("{}", ex);
+        // println!("{}", ex2);
         // for (c, e) in cases {
         // assert_eq!(ctx_evalparse(&mut ctx, c), e)
         // }
