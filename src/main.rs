@@ -56,6 +56,11 @@ lazy_static! {
     pub static ref HOLD_ALL_COMPLETE: Expr = Expr::from(Symbol::new("System`HoldAllComplete"));
     pub static ref FAILED: Expr = Expr::from(Symbol::new("System`$Failed"));
     pub static ref TABLE: Expr = Expr::from(Symbol::new("System`Table"));
+    pub static ref NEST_LIST: Expr = Expr::from(Symbol::new("System`NestList"));
+    pub static ref JOIN: Expr = Expr::from(Symbol::new("System`Join"));
+    pub static ref PART: Expr = Expr::from(Symbol::new("System`Part"));
+    pub static ref MAP: Expr = Expr::from(Symbol::new("System`Map"));
+    pub static ref LENGTH: Expr = Expr::from(Symbol::new("System`Length"));
 }
 
 #[derive(Helper, Completer, Hinter, Validator)]
@@ -91,6 +96,22 @@ impl Highlighter for ReplHelper {
         self.highlighter.highlight_char(line, pos)
     }
 }
+
+// how can i override the formatter 
+// impl fmt::Debug for Expr {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         match self {
+//             Expr::Int(i) => write!(f, "{}", i),
+//             Expr::Real(r) => write!(f, "{}", r),
+//             Expr::Sym(s) => write!(f, "{}", s),
+//             Expr::Str(s) => write!(f, "\"{}\"", s),
+//             Expr::List(lst) => {
+//                 let str_list: Vec<String> = lst.iter().map(|x| x.to_string()).collect();
+//                 write!(f, "({})", str_list.join(" "))
+//             }
+//         }
+//     }
+// }
 
 pub fn run(
     mut rl: rustyline::Editor<ReplHelper, rustyline::history::FileHistory>,
@@ -162,7 +183,7 @@ peg::parser! {
         rule whitespace() = ([' ' | '\t' | '\n' | '\r'] / comment())* // Allow whitespace or comments
 
         pub rule integer() -> Expr
-            = n:$("-"? ['0'..='9']+ ) { Expr::from(n.parse::<i64>().unwrap()) }
+            = n:$("-"? ['0'..='9']+ ) {? n.parse::<i64>().map(Expr::from).or(Err("Int")) }
 
         rule real() -> Expr
             = n:$("-"? ['0'..='9']* "." ['0'..='9']* ) { Expr::real(n.parse::<f64>().unwrap()) }
@@ -244,7 +265,7 @@ fn set(ctx: &mut Context2, ex: Expr) -> Expr {
     if let ExprKind::Normal(n) = ex.kind() {
         let (h, es) = (n.head(), n.elements());
         let is_delayed = h == &*SET_DELAYED;
-        println!("set: {h} | is_delayed: {is_delayed}");
+        // println!("set: {h} | is_delayed: {is_delayed}");
         let (lhs, rhs) = (es[0].clone(), es[1].clone());
         if let Some(t) = lhs.tag() {
             match lhs.kind() {
@@ -253,7 +274,7 @@ fn set(ctx: &mut Context2, ex: Expr) -> Expr {
                     let mut te = TableEntry::new();
                     te.own = Some(es[1].clone());
                     ctx.vars.insert(t.clone().into(), te);
-                    println!("ownvalue: {t:?} | {rhs}");
+                    // println!("ownvalue: {t:?} | {rhs}");
                     if is_delayed {
                         return Expr::null();
                     }
@@ -426,30 +447,153 @@ fn table(ctx: &mut Context2, ex: Expr) -> Expr {
             }
         }
 
-        // let range_lists = &es[1..]; //.clone().reverse();
-        //                             // Table[ f[i,j], {i, imin, imax}, {j, jmin, jmax}]
-        //                             // Table[Table[f[i,j], {j, jmin, jmax}], {i, imin, imax}]
-        //                             // let mut ex = Expr::List(vec![sym("Table")]);
-        //                             // ex.push(table_body.clone());
+        let range_lists = &es[1..]; //.clone().reverse();
+                                    // Table[ f[i,j], {i, imin, imax}, {j, jmin, jmax}]
+                                    // Table[Table[f[i,j], {j, jmin, jmax}], {i, imin, imax}]
+                                    // let mut ex = Expr::List(vec![sym("Table")]);
+                                    // ex.push(table_body.clone());
 
-        // let mut nested_table = table_body.clone();
-        // for range in range_lists.iter().rev() {
-        //     let mut new_table = Expr::normal(sym("System`Table"), vec![nested_table.clone()]);
-        //     new_table = match &mut new_table.kind_mut() {
-        //         ExprKind::Normal(ref mut v) => {
-        //             v.push(range.clone());
-        //             new_table.clone()
-        //         }
-        //         _ => panic!("Unexpected expression type"),
-        //     };
-        //     nested_table = new_table;
-        // }
-        // return nested_table;
-        panic!()
+        let mut nested_table = table_body.clone();
+        for range in range_lists.iter().rev() {
+            let mut new_table = Expr::normal(sym("System`Table"), vec![nested_table.clone()]);
+            new_table = match &mut new_table.kind_mut() {
+                ExprKind::Normal(ref mut v) => {
+                    let mut es = v.elements().to_vec();
+                    es.push(range.clone());
+                    Expr::normal(v.head().clone(), es)
+                    // v.push(range.clone());
+                    // new_table.clone()
+                }
+                _ => panic!("Unexpected expression type"),
+            };
+            nested_table = new_table;
+        }
+        return nested_table;
+        // panic!()
     } else {
         panic!()
     }
 }
+
+fn nest_list(ctx: &mut Context2, ex: Expr) -> Expr {
+    if let ExprKind::Normal(n) = ex.kind() {
+        let (h, es) = (n.head(), n.elements());
+        let f = &es[0];
+        let x = &es[1];
+        let n = &es[2];
+        let mut v = vec![];
+        // let mut res = Expr::list(vec);
+        v.push(x.clone());
+        if let ExprKind::Integer(count) = n.kind() {
+            for _i in 0..count.to_i64().unwrap() {
+                let fi = evaluate(
+                    ctx,
+                    Expr::normal(f.clone(), vec![v.last().unwrap().clone()]),
+                );
+                v.push(fi);
+            }
+            return Expr::list(v);
+        } else {
+            return ex;
+        }
+    } else {
+        panic!()
+    }
+}
+
+fn join(ex: Expr) -> Expr {
+    if let ExprKind::Normal(n) = ex.kind() {
+        let (h, es) = (n.head(), n.elements());
+        let ha = head(es[0].clone());
+
+        let mut res = vec![];
+        for e in es {
+            if ha != head(e.clone()) {
+                println!("Join: heads of arguments are not all the same");
+                return ex;
+            }
+            if let ExprKind::Normal(ls) = e.kind() {
+                res.append(&mut ls.elements().to_vec());
+            } else {
+                //fix
+                return FAILED.clone();
+            }
+        }
+        return Expr::normal(ha, res);
+    } else {
+        panic!()
+    }
+}
+
+// (Part (f a b c) 1) -> a
+// (Part a 1) -> errord
+// (Part a 0) -> symbol
+// (Part (f a) (List 1)) -> f[a]
+// (Part (f a) (List 0)) -> f[f]
+// (Part (f (g a)) 1 1) -> a
+
+fn part(ex: Expr) -> Expr {
+    if let ExprKind::Normal(n) = ex.kind() {
+        let (h, es) = (n.head(), n.elements());
+        // println!("part: {:?}", es);
+        //h is  Part, es[0] is the expr being indexed into and es[1..] are the indices
+        if let ExprKind::Normal(e) = es[0].kind() {
+            // println!("normal e0 Part: {:?}", e);
+            let (eh, ees) = (e.head(), e.elements());
+            if es.len() > 2 {
+                let mut n = Expr::normal(PART.clone(), vec![es[0].clone(), es[1].clone()]);
+                for (i, part_elem) in es[2..].iter().enumerate() {
+                    n = Expr::normal(PART.clone(), vec![n, part_elem.clone()]);
+                }
+                println!("n: {}", n);
+                return n;
+            } else {
+                if let ExprKind::Integer(idx) = es[1].kind() {
+                    if *idx < 0 {
+                        println!("VERRY BAD BOI OUT BOUNDS ARE YOU!");
+                        return ex;
+                    } else if *idx == 0 {
+                        return eh.clone();
+                    } else {
+                        if idx.to_usize().unwrap() > ees.len() {
+                            println!("VERRY BAD BOI OUT BOUNDS ARE YOU!");
+                            return ex;
+                        }
+                        return ees[idx.to_usize().unwrap() - 1].clone();
+                    }
+                } else if let ExprKind::Normal(idx) = es[1].kind() {
+                    if idx.head() != &*LIST {
+                        // println!("Part: index must be an integer or list of integers");
+                        return ex;
+                    }
+                    let mut res = vec![];
+                    for elt in idx.elements() {
+                        res.push(Expr::normal(PART.clone(), vec![es[0].clone(), elt.clone()]));
+                    }
+                    return Expr::normal(eh.clone(), res);
+                }
+                return ex;
+                // todo!()
+            }
+        } else {
+            // this is the case (Part a 0)
+            // todo!()
+            println!("tdoo (Part a 0)");
+            // if 
+            return Expr::null();
+        }
+
+    // todo!()
+    } else {
+        panic!();
+    }
+}
+
+// fn map(ex: Expr) -> Expr {
+
+// }
+
+/// BUILTINS
 
 pub fn internal_functions_apply(ctx: &mut Context2, ex: Expr) -> Expr {
     // println!("Applying {}", ex);
@@ -496,6 +640,36 @@ pub fn internal_functions_apply(ctx: &mut Context2, ex: Expr) -> Expr {
             return replace_repeated(&es[0], &es[1]);
         } else if h == &*TABLE {
             return table(ctx, ex);
+        } else if h == &*NEST_LIST {
+            return nest_list(ctx, ex);
+        } else if h == &*JOIN {
+            return join(ex);
+        } else if h == &*PART {
+            return part(ex);
+        } else if h == &*MAP {
+            // Map[f, {a,b,c}]
+            // let mut res = liste(vec![head(&evaluated_args[1])]);
+            let f = &es[0];
+            let mapargs = &es[1];
+            if let ExprKind::Normal(ma) = mapargs.kind() {
+                let (mah, maes) = (ma.head(), ma.elements());
+                let mut res = vec![];
+                for (_i, arg) in maes.iter().enumerate() {
+                    let fi = Expr::normal(f.clone(), vec![arg.clone()]);
+                    res.push(fi);
+                }
+                return Expr::normal(mah.clone(), res);
+            } else {
+                return mapargs.clone();
+            }
+            // return part(ex);
+        } else if h == &*LENGTH {
+            if let ExprKind::Normal(les) = es[0].kind() {
+                return Expr::from(les.elements().len() as i64);
+            } else {
+                return 0.into()
+            }
+            
         } else if h == &Expr::symbol(Symbol::new("System`dump")) {
             println!("{:?}", ctx.vars);
             return Expr::null();
@@ -503,6 +677,8 @@ pub fn internal_functions_apply(ctx: &mut Context2, ex: Expr) -> Expr {
     }
     ex
 }
+
+// END INTERNAL
 
 fn head(e: Expr) -> Expr {
     if let Some(h) = e.normal_head() {
@@ -636,7 +812,7 @@ fn evaluate(ctx: &mut Context2, ex: Expr) -> Expr {
                     }
                 }
                 let reconstructed_ex = Expr::normal(nh.clone(), nes.clone());
-                println!("reconstructed_ex: {}", reconstructed_ex);
+                // println!("reconstructed_ex: {}", reconstructed_ex);
 
                 // step 14: apply user defined downvalues and subvalues
                 let exprime = match nh.kind() {
@@ -781,7 +957,7 @@ pub fn replace_all(expr: &Expr, rules: &Expr) -> Expr {
         let mut pos_map = HashMap::new();
         let mut named_map = HashMap::new();
         let rh = head(rule.clone());
-        println!("replace_all: {expr} | {rules} | {rh}");
+        // println!("replace_all: {expr} | {rules} | {rh}");
         assert!(rh == *RULE || rh == *RULE_DELAYED);
         if let ExprKind::Normal(rn) = rule.kind() {
             if my_match(
@@ -864,7 +1040,7 @@ fn pos_map_rebuild(
                 } else {
                     i as isize + 1
                 };
-                println!("iterating in pos_map_rebuild i: {i} | e: {e} | offset {offset}");
+                // println!("iterating in pos_map_rebuild i: {i} | e: {e} | offset {offset}");
                 new_pos.push(pos_in_list as usize);
                 let new_e = pos_map_rebuild(new_pos, e.clone(), pos_map, use_offset);
                 if let ExprKind::Normal(n) = new_e.kind() {
@@ -951,10 +1127,10 @@ fn rebuild_and_splice(
     use_offset: bool,
 ) -> Expr {
     let mut new_pat = pos_map_rebuild(pos.clone(), pat.clone(), pos_map, use_offset);
-    println!("rebuild_and_splice: {pos:?} | {pat} newpat {new_pat} | {pos_map:?} | {named_map:?} | {use_offset}", pos = pos, pat = pat, pos_map = pos_map, named_map = named_map, use_offset = use_offset);
+    // println!("rebuild_and_splice: {pos:?} | {pat} newpat {new_pat} | {pos_map:?} | {named_map:?} | {use_offset}", pos = pos, pat = pat, pos_map = pos_map, named_map = named_map, use_offset = use_offset);
     new_pat = named_rebuild_all(new_pat, named_map);
     new_pat = splice_sequences(new_pat, use_offset);
-    println!("POST SPLICE {new_pat}");
+    // println!("POST SPLICE {new_pat}");
     new_pat
 }
 
@@ -1101,8 +1277,13 @@ fn my_match(
                                     }
                                 }
                             } else {
+                                let ees = e.elements();
+                                if i - num_empty_bns > ees.len() {
+                                    println!("breaking news!");
+                                    break 'outer;
+                                }
                                 if !my_match(
-                                    e.elements()[i - num_empty_bns].clone(),
+                                    ees[i - num_empty_bns].clone(),
                                     pi.clone(),
                                     &new_pos,
                                     pos_map,
@@ -1258,7 +1439,11 @@ fn main() -> Result<()> {
     };
 
     let rl = setup_repl();
+    // Expr::symbol(Symbol::new("hi_world"));
+
     run_file(&mut ctx, Path::new("./lang/attrs.sexp")).unwrap();
+    run_file(&mut ctx, Path::new("./lang/startup.sexp")).unwrap();
+    run_file(&mut ctx, Path::new("./lang/aliases.sexp")).unwrap();
     run(rl, &mut ctx).unwrap();
 
     Ok(())

@@ -1,0 +1,12 @@
+(* (set ra replace_all)
+(set rr replace_repeated)
+(set list List)
+(set alts Alternatives) *)
+
+(Set set Set)
+(Set setd SetDelayed)
+(Set list List)
+(Set rule Rule)
+(Set pattern Pattern)
+(Set blank Blank)
+(Set Int Integer)

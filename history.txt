@@ -144,3 +144,85 @@ $x
 (Table x (List x 3 5))
 (Table x (List x 3 10 ))
 (Table x (List x 3 10 2))
+(SetDelayed (Nest (Pattern f (Blank)) (Pattern x (Blank)) 0) x)\n(SetDelayed (Nest (Pattern f (Blank)) (Pattern x (Blank)) (Pattern n (Blank Integer))) (f (Nest f x (Plus n -1))))\n
+(Nest f x 10)
+(Nest (f) x 10)
+(Table (List i j) (List i 1 10) (List j 10 20))
+(Set set Set)
+(set x 1)
+x
+(Set set Set)\n(Set setd SetDelayed)\n(Set list List)\n(Set rule Rule)
+(Set pattern Pattern)\n
+(Set set Set)\n(Set setd SetDelayed)\n(Set list List)\n(Set rule Rule)\n(Set pattern Pattern)\n(Set blank Blank)\n(Set Int Integer)
+(set sk_rules \n    (list \n        (rule (((s (pattern x (blank))) (pattern y (blank))) (pattern z (blank))) ((x z) (y z))) \n        (rule ((k (pattern x (blank))) (pattern y (blank))) \n        x)))
+(Set set Set)\n(Set setd SetDelayed)\n(Set list List)\n(Set rule Rule)\n(Set pattern Pattern)\n(Set blank Blank)\n(Set Int Integer)
+(set skrules \n    (list \n        (rule (((s (pattern x (blank))) (pattern y (blank))) (pattern z (blank))) ((x z) (y z))) \n        (rule ((k (pattern x (blank))) (pattern y (blank))) \n        x)))
+skrules
+(set succ (s ((s (k s)) k)))
+(setd (skn (pattern n (blank Int))) (Nest succ (s k) n))\n
+( skn 5)
+(Nest f x 3)
+(SetDelayed (Nest (Pattern f (Blank)) (Pattern x (Blank)) 0) x)\n(SetDelayed (Nest (Pattern f (Blank)) (Pattern x (Blank)) (Pattern n (Blank Integer))) (f (Nest f x (Plus n -1))))\n
+(skn 5)
+(succ 1)
+(skn 2)
+234a
+3.5a4
+(NestList f x 5)
+(Xor True False)
+(set (rule30 (pattern p (blank)) (pattern q (blank)) (pattern r (blank))) (Xor p (Or q r)))\n
+rule30 
+(rule30 True False True)
+(Xor False (Or True False))
+(Set (rule302 (Pattern p (Blank)) (Pattern q (Blank)) (Pattern r (Blank))) (Xor p (Or q r)))\n
+(rule302 True True True)
+(f (Sequence a b c))
+(Table (List i j) (List i 10) (List j 10))
+(Join (f a) (f b))
+(Join (f a) (g b))
+(Set (rule30 (Pattern p (Blank)) (Pattern q (Blank)) (Pattern r (Blank))) (Xor p (Or q r)))\n
+(rule30 True False True)
+30a
+(SetDelayed (padval \n    (Pattern xs (Blank List))\n    (Pattern val (Blank)))\n    (Join (List val) xs (List val)))\n
+(padval (List a b c) 1)
+(Part (f (g a)) 1 2 3)
+(Part (f a) 0)
+(Part (f a) 1)
+(Part (f (g a)) 1 1)
+(Part (f a b) (List 1 2))
+(Part (f a b c) (List 1 2))
+(Part (f a b c) (List 1 3))
+(Part f a (List 0))
+(Part (f a) (List 1))
+(Part (f a) (List 0))
+(Set u0 (ReplaceAll (List 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0) (List (Rule 0 False) (Rule 1 True))))\n
+(Map f (g a b c))
+(Map f (List a b c))
+\n(SetDelayed (padval \n    (Pattern xs (Blank List))\n    (Pattern val (Blank)))\n    (Join (List val) xs (List val)))\n\n(SetDelayed (lilpartition3\n    (Pattern xs (Blank List)))\n    (Table (List (Part xs i) (Part xs (Plus i 1)) (Part xs (Plus i 2))) (List i (Plus (Length xs) -2))\n    ))\n\n(SetDelayed (foo (Pattern xs (Blank List)))\n    (Map rule30 (lilpartition3 (padval xs False))))\n\n(Set u0 (ReplaceAll (List 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0) (List (Rule 0 False) (Rule 1 True))))\n
+(SetDelayed (rule30 \n    (List \n        (Pattern p (Blank)) \n        (Pattern q (Blank)) \n        (Pattern r (Blank)))) \n    (Xor p (Or q r)))\n
+(Set ls (ReplaceAll (NestList foo u0 20) (List (Rule False 0) (Rule True 1))))\n
+(SetDelayed (rule30 \n    (List \n        (Pattern p (Blank)) \n        (Pattern q (Blank)) \n        (Pattern r (Blank)))) \n    (Xor p (Or q r)))\n\n(* (setd (pad_zero (pattern xs (blank List))) (Join (List 0) xs (List 0)))\n(setd (idxs (pattern n (blank Int))) (Table (Plus i n_) (List n_ 0 n))) *)\n\n(SetDelayed (padval \n    (Pattern xs (Blank List))\n    (Pattern val (Blank)))\n    (Join (List val) xs (List val)))\n\n(SetDelayed (lilpartition3\n    (Pattern xs (Blank List)))\n    (Table (List (Part xs i) (Part xs (Plus i 1)) (Part xs (Plus i 2))) (List i (Plus (Length xs) -2))\n    ))\n\n(SetDelayed (foo (Pattern xs (Blank List)))\n    (Map rule30 (lilpartition3 (padval xs False))))\n\n(Set u0 (ReplaceAll (List 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0) (List (Rule 0 False) (Rule 1 True))))\n\n(Set ls (ReplaceAll (NestList foo u0 20) (List (Rule False 0) (Rule True 1))))\n
+(SetDelayed (rule30 \n    (List \n        (Pattern p (Blank)) \n        (Pattern q (Blank)) \n        (Pattern r (Blank)))) \n    (Xor p (Or q r)))\n\n(* (setd (pad_zero (pattern xs (blank List))) (Join (List 0) xs (List 0)))\n(setd (idxs (pattern n (blank Int))) (Table (Plus i n_) (List n_ 0 n))) *)\n\n(SetDelayed (padval \n    (Pattern xs (Blank List))\n    (Pattern val (Blank)))\n    (Join (List val) xs (List val)))\n\n(SetDelayed (lilpartition3\n    (Pattern xs (Blank List)))\n    (Table (List (Part xs i) (Part xs (Plus i 1)) (Part xs (Plus i 2))) (List i (Plus (Length xs) -2))\n    ))\n\n(SetDelayed (foo (Pattern xs (Blank List)))\n    (Map rule30 (lilpartition3 (padval xs False))))\n\n(Set u0 (ReplaceAll (List 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0) (List (Rule 0 False) (Rule 1 True))))\n
+(lilpartition3 u0)
+(Length (List a b c))
+(Length a)
+\n(SetDelayed (rule30 \n    (List \n        (Pattern p (Blank)) \n        (Pattern q (Blank)) \n        (Pattern r (Blank)))) \n    (Xor p (Or q r)))\n\n(* (setd (pad_zero (pattern xs (blank List))) (Join (List 0) xs (List 0)))\n(setd (idxs (pattern n (blank Int))) (Table (Plus i n_) (List n_ 0 n))) *)\n\n(SetDelayed (padval \n    (Pattern xs (Blank List))\n    (Pattern val (Blank)))\n    (Join (List val) xs (List val)))\n\n(SetDelayed (lilpartition3\n    (Pattern xs (Blank List)))\n    (Table (List (Part xs i) (Part xs (Plus i 1)) (Part xs (Plus i 2))) (List i (Plus (Length xs) -2))\n    ))\n\n(SetDelayed (foo (Pattern xs (Blank List)))\n    (Map rule30 (lilpartition3 (padval xs False))))\n\n(Set u0 (ReplaceAll (List 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0) (List (Rule 0 False) (Rule 1 True))))\n
+(lilpartition3 xs)
+xs
+(lilpartition3 u0)
+\n(SetDelayed (rule30 \n    (List \n        (Pattern p (Blank)) \n        (Pattern q (Blank)) \n        (Pattern r (Blank)))) \n    (Xor p (Or q r)))\n\n(* (setd (pad_zero (pattern xs (blank List))) (Join (List 0) xs (List 0)))\n(setd (idxs (pattern n (blank Int))) (Table (Plus i n_) (List n_ 0 n))) *)\n\n(SetDelayed (padval \n    (Pattern xs (Blank List))\n    (Pattern val (Blank)))\n    (Join (List val) xs (List val)))\n\n(SetDelayed (lilpartition3\n    (Pattern xs (Blank List)))\n    (Table (List (Part xs i) (Part xs (Plus i 1)) (Part xs (Plus i 2))) (List i (Plus (Length xs) -2))\n    ))\n\n(SetDelayed (foo (Pattern xs (Blank List)))\n    (Map rule30 (lilpartition3 (padval xs False))))\n\n(Set u0 (ReplaceAll (List 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0) (List (Rule 0 False) (Rule 1 True))))\n
+(foo u0)
+(Set ls (ReplaceAll (NestList foo u0 20) (List (Rule False 0) (Rule True 1))))\n
+(Part ls 1)
+(Part ls 2)
+(Part ls 3)
+(Part ls 4)
+(Part ls 5)
+(Part ls 6)
+\n(SetDelayed (rule30 \n    (List \n        (Pattern p (Blank)) \n        (Pattern q (Blank)) \n        (Pattern r (Blank)))) \n    (Xor p (Or q r)))\n\n(* (setd (pad_zero (pattern xs (blank List))) (Join (List 0) xs (List 0)))\n(setd (idxs (pattern n (blank Int))) (Table (Plus i n_) (List n_ 0 n))) *)\n\n(SetDelayed (padval \n    (Pattern xs (Blank List))\n    (Pattern val (Blank)))\n    (Join (List val) xs (List val)))\n\n(SetDelayed (lilpartition3\n    (Pattern xs (Blank List)))\n    (Table (List (Part xs i) (Part xs (Plus i 1)) (Part xs (Plus i 2))) (List i (Plus (Length xs) -2))\n    ))\n\n(SetDelayed (foo (Pattern xs (Blank List)))\n    (Map rule30 (lilpartition3 (padval xs False))))\n\n(Set u0 (ReplaceAll (List 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0) (List (Rule 0 False) (Rule 1 True))))\n\n(Set ls (ReplaceAll (NestList foo u0 20) (List (Rule False 0) (Rule True 1))))\n
+(Part ls 1)
+(Part ls 2)
+(Part ls 3)
+(Part ls 4)
+(* combinators *)\n(Set skrules \n    (List \n        (Rule (((s (Pattern x (Blank))) (Pattern y (Blank))) (Pattern z (Blank))) ((x z) (y z))) \n        (Rule ((k (Pattern x (Blank))) (Pattern y (Blank))) \n        x)))\n\n(Set succ (s ((s (k s)) k)))\n(SetDelayed (skn (Pattern n (Blank Integer))) (Nest succ (s k) n))\n
+(skn 3)
