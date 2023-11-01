@@ -37,6 +37,7 @@ lazy_static! {
     pub static ref PATTERN: Expr = Expr::from(Symbol::new("System`Pattern"));
     pub static ref HOLD_PATTERN: Expr = Expr::from(Symbol::new("System`HoldPattern"));
     pub static ref SEQUENCE: Expr = Expr::from(Symbol::new("System`Sequence"));
+    pub static ref SEQUENCE_HOLD: Expr = Expr::from(Symbol::new("System`SequenceHold"));
     pub static ref MATCHQ: Expr = Expr::from(Symbol::new("System`MatchQ"));
     pub static ref HEAD: Expr = Expr::from(Symbol::new("System`Head"));
     pub static ref PLUS: Expr = Expr::from(Symbol::new("System`Plus"));
@@ -61,6 +62,8 @@ lazy_static! {
     pub static ref PART: Expr = Expr::from(Symbol::new("System`Part"));
     pub static ref MAP: Expr = Expr::from(Symbol::new("System`Map"));
     pub static ref LENGTH: Expr = Expr::from(Symbol::new("System`Length"));
+    pub static ref TIMING: Expr = Expr::from(Symbol::new("System`Timing"));
+    pub static ref FLAT: Expr = Expr::from(Symbol::new("System`Flat"));
 }
 
 #[derive(Helper, Completer, Hinter, Validator)]
@@ -97,7 +100,7 @@ impl Highlighter for ReplHelper {
     }
 }
 
-// how can i override the formatter 
+// how can i override the formatter
 // impl fmt::Debug for Expr {
 //     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 //         match self {
@@ -159,7 +162,7 @@ pub fn run(
     Ok(())
 }
 
-fn setup_repl() -> Editor<ReplHelper, FileHistory> {
+fn setup_repl<P: AsRef<Path> + ?Sized>(history_path: &P) -> Editor<ReplHelper, FileHistory> {
     let h = ReplHelper {
         highlighter: MatchingBracketHighlighter::new(),
         colored_prompt: "".to_owned(),
@@ -169,7 +172,7 @@ fn setup_repl() -> Editor<ReplHelper, FileHistory> {
     let mut rl = Editor::with_config(config).unwrap();
     rl.set_max_history_size(10000).unwrap();
     rl.set_helper(Some(h));
-    if rl.load_history("history.txt").is_err() {
+    if rl.load_history(history_path).is_err() {
         println!("No previous history.");
     }
     rl
@@ -265,7 +268,8 @@ fn set(ctx: &mut Context2, ex: Expr) -> Expr {
     if let ExprKind::Normal(n) = ex.kind() {
         let (h, es) = (n.head(), n.elements());
         let is_delayed = h == &*SET_DELAYED;
-        // println!("set: {h} | is_delayed: {is_delayed}");
+        // println!("ex: {ex}, set: {h} | is_delayed: {is_delayed}");
+
         let (lhs, rhs) = (es[0].clone(), es[1].clone());
         if let Some(t) = lhs.tag() {
             match lhs.kind() {
@@ -310,7 +314,30 @@ fn set(ctx: &mut Context2, ex: Expr) -> Expr {
                                 panic!("non Normal downvalue???")
                             }
                         }
-                        _ => todo!("subval"),
+                        ExprKind::Normal(nhn) => {
+                            println!("subvalue: {nhn:?} | {rhs}");
+                            let te: &mut TableEntry = ctx
+                                .vars
+                                .entry(t.clone().into())
+                                .or_insert_with(TableEntry::new);
+                            let hp = Expr::normal(HOLD_PATTERN.clone(), vec![lhs.clone()]);
+                            let sv = Expr::normal(RULE_DELAYED.clone(), vec![hp, rhs.clone()]);
+                            let s = &mut te.sub;
+                            if let ExprKind::Normal(sn) = s.kind_mut() {
+                                let mut nes = sn.clone().into_elements();
+                                nes.push(sv);
+                                te.sub = Expr::normal(sn.head().clone(), nes);
+                                if is_delayed {
+                                    return Expr::null();
+                                }
+                                return rhs.clone();
+                            } else {
+                                panic!("non Normal downvalue???")
+                            }                        }
+                        _=> {
+                            println!("something WEIRD is happening ");
+                            panic!()
+                        }
                     }
                 }
                 _ => {
@@ -579,7 +606,7 @@ fn part(ex: Expr) -> Expr {
             // this is the case (Part a 0)
             // todo!()
             println!("tdoo (Part a 0)");
-            // if 
+            // if
             return Expr::null();
         }
 
@@ -667,9 +694,21 @@ pub fn internal_functions_apply(ctx: &mut Context2, ex: Expr) -> Expr {
             if let ExprKind::Normal(les) = es[0].kind() {
                 return Expr::from(les.elements().len() as i64);
             } else {
-                return 0.into()
+                return 0.into();
             }
-            
+        } else if h == &*TIMING {
+            let t1 = Instant::now();
+            let res = evaluate(ctx, es[0].clone());
+            let dt = t1.elapsed(); // Capture the elapsed time
+
+            // Convert duration to seconds
+            let elapsed_seconds = dt.as_secs() as f64 + dt.subsec_nanos() as f64 * 1e-9;
+            // NotNan
+            return Expr::list(vec![
+                // Expr::real(NotNan::new(elapsed_seconds).unwrap()),
+                Expr::real(elapsed_seconds),
+                res,
+            ]);
         } else if h == &Expr::symbol(Symbol::new("System`dump")) {
             println!("{:?}", ctx.vars);
             return Expr::null();
@@ -760,11 +799,35 @@ fn get_attributes(ctx: &mut Context2, nh: Expr) -> Expr {
     nh_attrs
 }
 
+// fn splice_elements(
+//     nes: Vec<Expr>,
+//     attribute: Expr,
+//     symbol: &Expr,
+//     attrs_vec: &[Expr],
+// ) -> Vec<Expr> {
+//     let mut new_elements = vec![];
+//     if attrs_vec.contains(&attribute) {
+//         for ne in nes.iter() {
+//             if let ExprKind::Normal(e) = &ne.kind() {
+//                 if e.head() == symbol {
+//                     new_elements.extend(e.clone().into_elements());
+//                 } else {
+//                     new_elements.push(ne.clone());
+//                 }
+//             } else {
+//                 new_elements.push(ne.clone());
+//             }
+//         }
+//     }
+//     new_elements
+// }
+/// the evaluation procedure here closely follows the text "Power Programming with Mathematica"
 fn evaluate(ctx: &mut Context2, ex: Expr) -> Expr {
     let mut expr = ex.clone();
     let mut last = None;
     // println!("Evaluating {}", expr);
     loop {
+        // step 4
         // If the expression hasn't changed, break the loop.
         if Some(&expr) == last.as_ref() {
             break;
@@ -774,6 +837,7 @@ fn evaluate(ctx: &mut Context2, ex: Expr) -> Expr {
         match expr.kind() {
             ExprKind::Normal(n) => {
                 let (h, es) = (n.head(), n.elements());
+                // step 5
                 let nh = evaluate(ctx, h.clone());
                 // println!("nh_attrs: {}", nh_attrs);
                 let nh_attrs_vec =
@@ -782,11 +846,13 @@ fn evaluate(ctx: &mut Context2, ex: Expr) -> Expr {
                     } else {
                         vec![]
                     };
-                // step 7
+
+                // step 6
                 if nh_attrs_vec.contains(&HOLD_ALL_COMPLETE) {
                     // skip to 14
                     todo!();
                 }
+                // step 7
                 // hold_mask entry with a zero means "don't hold"
                 let mut hold_mask = vec![false; es.len()];
 
@@ -814,6 +880,45 @@ fn evaluate(ctx: &mut Context2, ex: Expr) -> Expr {
                 let reconstructed_ex = Expr::normal(nh.clone(), nes.clone());
                 // println!("reconstructed_ex: {}", reconstructed_ex);
 
+                // step 8, Flat splicing
+                let mut new_elements = vec![];
+                if nh_attrs_vec.contains(&FLAT) {
+                    for ne in nes.iter() {
+                        if let ExprKind::Normal(e) = &ne.kind() {
+                            if e.head() == &nh {
+                                new_elements.extend(e.clone().into_elements());
+                            } else {
+                                new_elements.push(ne.clone());
+                            }
+                        } else {
+                            new_elements.push(ne.clone());
+                        }
+                    }
+                    // println!("new_elements: {:?}", new_elements);
+                    nes = new_elements;
+                }
+
+                // step 9, Sequence splicing
+                let mut new_elements = vec![];
+                if !nh_attrs_vec.contains(&SEQUENCE_HOLD) {
+                    for ne in nes.iter() {
+                        if let ExprKind::Normal(e) = &ne.kind() {
+                            if e.head() == &*SEQUENCE {
+                                new_elements.extend(e.clone().into_elements());
+                            } else {
+                                new_elements.push(ne.clone());
+                            }
+                        } else {
+                            new_elements.push(ne.clone());
+                        }
+                    }
+                    nes = new_elements;
+                }
+
+                // step 10, Listable
+
+                // step 11, Orderless
+
                 // step 14: apply user defined downvalues and subvalues
                 let exprime = match nh.kind() {
                     // we dont need to panic here "abc"[foo] doesn't
@@ -836,7 +941,20 @@ fn evaluate(ctx: &mut Context2, ex: Expr) -> Expr {
                         exprime
                     }
                     // subvalue
-                    ExprKind::Normal(_) => reconstructed_ex.clone(),
+                    ExprKind::Normal(_) => {
+                        let tag = nh.tag().unwrap();
+                        let te = ctx.vars.entry(tag.into()).or_insert_with(TableEntry::new);
+                        let svs = &te.sub;
+                        // println!("looking for user defined sub_values for {} -> {}", nh, svs);
+
+                        // should this be replace_all? or replace_repeated?
+
+                        let exprime = replace_all(&reconstructed_ex, svs);
+                        // println!("before: {}", reconstructed_ex);
+                        // println!("after: {}", exprime);
+                        exprime
+                        // reconstructed_ex
+                    }
                 };
 
                 // im not sure if this is correct, but it seems necesary,
@@ -926,7 +1044,11 @@ pub fn replace(expr: &Expr, rules: &Expr) -> Expr {
         let mut pos_map = HashMap::new();
         let mut named_map = HashMap::new();
         let rh = head(rule.clone());
-        assert!(rh == *RULE || rh == *RULE_DELAYED);
+        if rh != *RULE && rh != *RULE_DELAYED {
+            println!("replace_all: rule must be a rule or rule delayed");
+            // note this is not what WL does
+            return FAILED.clone();
+        }
         if let ExprKind::Normal(rn) = rule.kind() {
             if my_match(
                 expr.clone(),
@@ -952,13 +1074,18 @@ pub fn replace_all(expr: &Expr, rules: &Expr) -> Expr {
     let mut ctx = Context2 {
         vars: HashMap::new(),
     };
-    for rule in rules_list {
+    for rule in &rules_list {
         let pos = vec![];
         let mut pos_map = HashMap::new();
         let mut named_map = HashMap::new();
         let rh = head(rule.clone());
         // println!("replace_all: {expr} | {rules} | {rh}");
-        assert!(rh == *RULE || rh == *RULE_DELAYED);
+        if rh != *RULE && rh != *RULE_DELAYED {
+            println!("replace_all: rule must be a rule or rule delayed");
+            // note this is not what WL does
+            return FAILED.clone();
+        }
+
         if let ExprKind::Normal(rn) = rule.kind() {
             if my_match(
                 expr.clone(),
@@ -1198,7 +1325,7 @@ fn my_match(
                     let (pih, pies) = (pn.head(), pn.elements());
 
                     if pih == &Expr::from(SEQUENCE.clone()) && pies.is_empty() {
-                        println!("found empty sequence at {new_pos:?}");
+                        // println!("found empty sequence at {new_pos:?}");
                         num_empty_bns += 1;
                         continue;
                     }
@@ -1225,7 +1352,7 @@ fn my_match(
                                     // which start at index i and go to i+j
 
                                     if i + j - num_empty_bns > ees.len() {
-                                        println!("breaking news!");
+                                        // println!("breaking news!");
                                         break 'outer;
                                     }
 
@@ -1278,8 +1405,8 @@ fn my_match(
                                 }
                             } else {
                                 let ees = e.elements();
-                                if i - num_empty_bns > ees.len() {
-                                    println!("breaking news!");
+                                if i - num_empty_bns >= ees.len() {
+                                    // println!("breaking news!");
                                     break 'outer;
                                 }
                                 if !my_match(
@@ -1316,7 +1443,7 @@ fn my_match(
                             // which start at index i and go to i+j
 
                             if i + j - num_empty_bns > ees.len() {
-                                println!("breaking news!");
+                                // println!("breaking news!");
                                 break 'outer;
                             }
 
@@ -1418,19 +1545,23 @@ fn my_match(
     }
 }
 
-pub fn run_file(ctx: &mut Context2, filepath: &Path) -> Result<Expr> {
-    let file_contents = std::fs::read_to_string(filepath)?;
-    println!("Running file: {}", filepath.display());
+// Function that takes a string, parses it, and evaluates the parsed expressions.
+pub fn parse_and_evaluate(ctx: &mut Context2, input: &str) -> Result<Expr> {
     // i dont love this because it's ambigious whether or not something failed in reading the file or sth
     // or if the last expr in the file was a setd or something that returns a Null
     let mut res = Expr::null();
-    let exprs = expr_parser::expressions(&file_contents).unwrap();
-    // for line in reader.lines() {
+    let exprs = expr_parser::expressions(input).unwrap(); // Handle error appropriately
     for expr in exprs {
-        res = evaluate(ctx, expr);
+        res = evaluate(ctx, expr); // Assuming evaluate() returns Expr
     }
-
     Ok(res)
+}
+
+// Function that reads a file and then calls parse_and_evaluate.
+pub fn run_file(ctx: &mut Context2, filepath: &Path) -> Result<Expr> {
+    let file_contents = std::fs::read_to_string(filepath)?;
+    println!("Running file: {}", filepath.display());
+    parse_and_evaluate(ctx, &file_contents)
 }
 
 fn main() -> Result<()> {
@@ -1438,12 +1569,19 @@ fn main() -> Result<()> {
         vars: HashMap::new(),
     };
 
-    let rl = setup_repl();
-    // Expr::symbol(Symbol::new("hi_world"));
+    let rl = setup_repl("history.txt");
 
-    run_file(&mut ctx, Path::new("./lang/attrs.sexp")).unwrap();
-    run_file(&mut ctx, Path::new("./lang/startup.sexp")).unwrap();
-    run_file(&mut ctx, Path::new("./lang/aliases.sexp")).unwrap();
+    // im not sure i should be bundling the entire source code into the binary
+    let startup_strs = vec![
+        include_str!("../lang/attrs.sexp"),
+        include_str!("../lang/startup.sexp"),
+        // include_str!("../lang/aliases.sexp"),
+    ];
+
+    startup_strs.iter().for_each(|s| {
+        parse_and_evaluate(&mut ctx, s).unwrap();
+    });
+
     run(rl, &mut ctx).unwrap();
 
     Ok(())

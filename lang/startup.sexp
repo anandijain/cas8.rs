@@ -34,6 +34,10 @@
 (SetDelayed (If False (Pattern x (Blank)) (Pattern y (Blank)) (Pattern z (Blank))) y)
 (SetDelayed (If (Pattern t (Blank)) (Pattern x (Blank)) (Pattern y (Blank)) (Pattern z (Blank))) z)
 
-
 (SetDelayed (Nest (Pattern f (Blank)) (Pattern x (Blank)) 0) x)
 (SetDelayed (Nest (Pattern f (Blank)) (Pattern x (Blank)) (Pattern n (Blank Integer))) (f (Nest f x (Plus n -1))))
+
+(SetDelayed (First (List (Pattern x (Blank)) (Pattern rest (BlankNullSequence)))) x)
+(SetDelayed (First (Pattern xs (BlankNullSequence))) (First (List xs)))
+(SetDelayed (Rest (List (Blank) (Pattern rest (BlankNullSequence)))) (List rest))
+(SetDelayed (Rest (Pattern xs (BlankNullSequence))) (Rest (List xs)))

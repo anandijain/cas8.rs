@@ -39,10 +39,14 @@
 (SetDelayed (foo (Pattern xs (Blank List)))
     (Map rule30 (lilpartition3 (padval xs False))))
 
-(Set u0 (ReplaceAll (List 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0) (List (Rule 0 False) (Rule 1 True))))
+(Set u0 (Join (Table 0 100) (List 1) (Table 0 100)))
+(Set x0 (ReplaceAll u0 (List (Rule 0 False) (Rule 1 True))))
 
-(Set ls (ReplaceAll (NestList foo u0 20) (List (Rule False 0) (Rule True 1))))
+(Set ls (NestList foo x0 5))
 
 (* rendering *)
 (Set ps (ReplaceAll ls (List (Rule 0 (List 1. 1. 1.)) (Rule 1 (List 0. 0. 0.)))))
 (Export "rule_30.svg" ps)
+
+
+(* (Set u0 (ReplaceAll  (List (Rule 0 False) (Rule 1 True)))) *)

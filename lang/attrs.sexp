@@ -16,3 +16,11 @@
 (Set (Attributes Rule) (List SequenceHold))
 (Set (Attributes Table) (List HoldAll))
 (Set (Attributes Timing) (List HoldAll))
+
+(* Note the only attributes in these that are acutally supported is Flat  *)
+(Set (Attributes Plus) (List Flat Listable NumericFunction OneIdentity Orderless Protected))
+(Set (Attributes Times) (List Flat Listable NumericFunction OneIdentity Orderless Protected))
+(Set (Attributes Join) (List Flat))
+(Set (Attributes Or) (List Flat))
+(Set (Attributes And) (List Flat))
+(Set (Attributes Xor) (List Flat Orderless))
