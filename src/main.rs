@@ -64,6 +64,7 @@ lazy_static! {
     pub static ref LENGTH: Expr = Expr::from(Symbol::new("System`Length"));
     pub static ref TIMING: Expr = Expr::from(Symbol::new("System`Timing"));
     pub static ref FLAT: Expr = Expr::from(Symbol::new("System`Flat"));
+    pub static ref CLEAR: Expr = Expr::from(Symbol::new("System`Clear"));
 }
 
 #[derive(Helper, Completer, Hinter, Validator)]
@@ -333,8 +334,9 @@ fn set(ctx: &mut Context2, ex: Expr) -> Expr {
                                 return rhs.clone();
                             } else {
                                 panic!("non Normal downvalue???")
-                            }                        }
-                        _=> {
+                            }
+                        }
+                        _ => {
                             println!("something WEIRD is happening ");
                             panic!()
                         }
@@ -616,9 +618,26 @@ fn part(ex: Expr) -> Expr {
     }
 }
 
-// fn map(ex: Expr) -> Expr {
-
-// }
+fn clear(ctx: &mut Context2, ex: Expr) -> Expr {
+    if let ExprKind::Normal(n) = ex.kind() {
+        let (h, es) = (n.head(), n.elements());
+        for e in es {
+            match e.kind() {
+                ExprKind::Symbol(_) => {
+                    println!("clearing symbol {e}");
+                    ctx.vars.insert(e.clone(), TableEntry::new());
+                }
+                _ => {
+                    println!("clearing something wrong");
+                    return FAILED.clone();
+                }
+            }
+        }
+        return Expr::null();
+    } else {
+        panic!("what the ehye ")
+    }
+}
 
 /// BUILTINS
 
@@ -712,6 +731,8 @@ pub fn internal_functions_apply(ctx: &mut Context2, ex: Expr) -> Expr {
         } else if h == &Expr::symbol(Symbol::new("System`dump")) {
             println!("{:?}", ctx.vars);
             return Expr::null();
+        } else if h == &*CLEAR {
+            return clear(ctx, ex);
         }
     }
     ex

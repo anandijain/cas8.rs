@@ -5,6 +5,10 @@
         (Rule ((k (Pattern x (Blank))) (Pattern y (Blank))) 
         x)))
 
+(* sk rules in subvalue definition form *)
+(Set ((k (Pattern x (Blank))) (Pattern y (Blank))) x)
+(Set (((s (Pattern x (Blank))) (Pattern y (Blank))) (Pattern z (Blank))) ((x z) (y z)))
+
 (Set succ (s ((s (k s)) k)))
 (SetDelayed (skn (Pattern n (Blank Integer))) (Nest succ (s k) n))
 
@@ -15,6 +19,7 @@
 (* CA *)
 (* (Set (rule30 (Pattern p (Blank)) (Pattern q (Blank)) (Pattern r (Blank))) (Xor p (Or q r))) *)
 (Set (rule30 (Pattern p (Blank)) (Pattern q (Blank)) (Pattern r (Blank))) (Xor p (Or q r)))
+
 
 (SetDelayed (rule30 
     (List 

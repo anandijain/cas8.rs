@@ -283,3 +283,24 @@ Fac
 ((k a) b)
 (Set ((k (Pattern x (Blank))) (Pattern y (Blank))) x)
 ((k 1) 2)
+(Set (((s (Pattern x (Blank))) (Pattern y (Blank))) (Pattern z (Blank))) ((x z) (y z)))
+(((s a) b) c)
+(* combinators *)\n(Set skrules \n    (List \n        (Rule (((s (Pattern x (Blank))) (Pattern y (Blank))) (Pattern z (Blank))) ((x z) (y z))) \n        (Rule ((k (Pattern x (Blank))) (Pattern y (Blank))) \n        x)))\n
+(Set f 1)
+f
+(Clear f)
+f
+(Set f 1)
+f
+(Clear f)
+f
+(Set f 1)
+(Set g 2)
+(Clear f g)
+f
+g
+(* combinators *)\n(Set skrules \n    (List \n        (Rule (((s (Pattern x (Blank))) (Pattern y (Blank))) (Pattern z (Blank))) ((x z) (y z))) \n        (Rule ((k (Pattern x (Blank))) (Pattern y (Blank))) \n        x)))\n
+(Set succ (s ((s (k s)) k)))\n(SetDelayed (skn (Pattern n (Blank Integer))) (Nest succ (s k) n))\n
+(Set skplus ((s (k s)) (s (k ((s (k s)) k)))))\n(Set sktimes ((s (k s)) k))\n(Set skpow ((s (k (s ((s k) k)))) k))\n
+(Set x (Nest succ (s k) 10))\n
+(ReplaceRepeated ((x s) k) skrules)
