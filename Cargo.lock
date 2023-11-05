@@ -441,8 +441,7 @@ checksum = "ed94fce61571a4006852b7389a063ab983c02eb1bb37b47f8272ce92d06d9538"
 [[package]]
 name = "wolfram-expr"
 version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "614f5538290eb531931222ac71322f5b2617cd80243e24d02a1c28cfa172eebd"
+source = "git+https://github.com/anandijain/wolfram-expr-rs?branch=master#304db57eb32fb0837b56ecca9d643679d458b6e8"
 dependencies = [
  "ordered-float 3.9.2",
 ]

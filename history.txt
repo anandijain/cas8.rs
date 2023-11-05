@@ -304,3 +304,13 @@ g
 (Set skplus ((s (k s)) (s (k ((s (k s)) k)))))\n(Set sktimes ((s (k s)) k))\n(Set skpow ((s (k (s ((s k) k)))) k))\n
 (Set x (Nest succ (s k) 10))\n
 (ReplaceRepeated ((x s) k) skrules)
+(set k 3)
+(Set k 3)
+(Equal (Divide (Plus x -1) 3) k)
+x
+(Plux x 1)
+(Plus x 1)
+(Times (Plus x 1) 2)
+(Plus 1 1 )
+x
+(p x 1)
