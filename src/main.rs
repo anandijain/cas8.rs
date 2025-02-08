@@ -898,7 +898,7 @@ fn evaluate(ctx: &mut Context2, ex: Expr) -> Expr {
                         nes.push(ne);
                     }
                 }
-                let reconstructed_ex = Expr::normal(nh.clone(), nes.clone());
+                let mut reconstructed_ex = Expr::normal(nh.clone(), nes.clone());
                 // println!("reconstructed_ex: {}", reconstructed_ex);
 
                 // step 8, Flat splicing
@@ -964,12 +964,58 @@ fn evaluate(ctx: &mut Context2, ex: Expr) -> Expr {
                     // subvalue
                     ExprKind::Normal(_) => {
                         let tag = nh.tag().unwrap();
-                        let te = ctx.vars.entry(tag.into()).or_insert_with(TableEntry::new);
+                        let te = ctx
+                            .vars
+                            .entry(tag.clone().into())
+                            .or_insert_with(TableEntry::new);
                         let svs = &te.sub;
-                        // println!("looking for user defined sub_values for {} -> {}", nh, svs);
+                        // println!("looking for user defined sub_values for {} -> {}. tag {} new_elements {:?}", nh, svs, tag.clone(), nes.clone());
+                        if tag.clone() == sym("System`Function") {
 
+                            // the args to the anon f is nes
+                            // len(nes) must be equal to len nh[1]
+                            // what i want
+                            // let frules = vec!["(Rule a x)" (Rule b y)...]
+                            // return replace_all(body, frules)
+                            let argnames = nh.normal_part(0).unwrap();
+
+                            let mut rules = vec![];
+                            if let ExprKind::Normal(argnameshead) = argnames.kind() {
+                                let (nhh, nhes) = (argnameshead.head(), argnameshead.elements());
+                                assert_eq!(nhh, &*LIST);
+                                if nhes.len() != nes.len() {
+                                    println!("wrong number of arguments to anon function");
+                                    return FAILED.clone();
+                                }
+
+                                for (i, nhe) in nhes.iter().enumerate() {
+                                    // assert its a Sym
+                                    if let ExprKind::Symbol(argsym) = nhe.kind() {
+                                        let r = Expr::rule(argsym.clone(), nes[i].clone());
+                                        rules.push(r);
+                                    } else {
+                                        println!("need sym or list sym for argnames of Function");
+                                        return FAILED.clone();
+                                    }
+                                }
+                                // let body = nh.normal_part(1).unwrap();
+                                // let args
+                            } else if let ExprKind::Symbol(argname) = argnames.kind() {
+                                // this is a single arg function
+                                let r = Expr::rule(argname.clone(), nes[0].clone());
+                                rules.push(r);
+                            } else {
+                                println!("need sym or list sym for argnames of Function");
+                                return FAILED.clone();
+                            }
+                            let body = nh.normal_part(1).unwrap();
+                            // println!("tag is func. body: {}", body);
+                            let rules_expr = Expr::list(rules);
+                            // println!("rules_expr: {}", rules_expr.clone());
+                            reconstructed_ex = replace_all(body , &rules_expr);
+                            // println!("reconstructed_ex: {}", reconstructed_ex.clone());
+                        }
                         // should this be replace_all? or replace_repeated?
-
                         let exprime = replace_all(&reconstructed_ex, svs);
                         // println!("before: {}", reconstructed_ex);
                         // println!("after: {}", exprime);
@@ -1718,4 +1764,6 @@ mod tests {
         // assert_eq!(ctx_evalparse(&mut ctx, c), e)
         // }
     }
+
+    #[]
 }

@@ -314,3 +314,74 @@ x
 (Plus 1 1 )
 x
 (p x 1)
+(Plus 1 1 )
+(Set (f_ (f_ x_)) 1)
+(Set ((Pattern f (Blank)) ((Pattern f (Blank)) (Pattern x (Blank))) 1))
+(Set (Pattern f (Blank)) 1)
+a
+f
+(Set (Blank) 1)
+a
+3
+(Set (f (Blank)) 1)
+(f any)
+(Set sk_rules)
+(Set srule (Rule (((S (Pattern x (Blank))) (Pattern y (Blank))) (Pattern z (Blank))) ((x z) y)))
+srule
+(Set krule (Rule ((k (Pattern x (Blank))) (Pattern y (Blank))) x))
+(Set skrules (List srule krule))
+skrules
+(Set succ (s ((s (k s)) k)))
+(Nest succ (s k) 10)
+(ReplaceRepeated (((Nest succ (s k) 10) s) k) skrules)
+skrules
+(Nest succ (S K) 10)
+(Set succ (S ((S (K S)) K)))
+(Nest succ (S K) 10)
+(ReplaceRepeated (((Nest succ (S K) 10) S) K) skrules)
+skrules
+(((S a) b) c)
+(Set srule (Rule (((S (Pattern x (Blank))) (Pattern y (Blank))) (Pattern z (Blank))) ((x z) y)))
+(Set (((S (Pattern x (Blank))) (Pattern y (Blank))) (Pattern z (Blank))) ((x z) y))
+(((S a) b) c)
+(((S x) y) z)
+(Set (((S (Pattern x (Blank))) (Pattern y (Blank))) (Pattern z (Blank))) ((x z) (y z)))
+(((S x) y) z)
+(Set (((S (Pattern x (Blank))) (Pattern y (Blank))) (Pattern z (Blank))) ((x z) (y z)))
+(((S x) y) z)
+(Set (f (Pattern x (Blank List))) "hi")
+(f (List a b c))
+(f 1)
+D
+((Function x (Plus x 1)) y)
+ (Set ra ReplaceAll)
+(?)
+ (Set ra ReplaceAll)
+(ra (Plus a b c) (List (Rule a x) (Rule b y) (Rule c z)))
+((Function x (Plus x 1)) y)
+((Function x (Plus x 1)) 1)
+((Function x (Plus x 1)) 1 2)
+((Function x (Plus x 1)) y)
+((Function (List a b) (Plus x 1)) x y)
+((Function x (Plus x 1)) 2)
+x
+(Set x 1)
+x
+((Function x (Plus x 1)) 1)
+((Function x (Plus x 1)) 0)
+((Function x (Plus x 1)) (Function x (Plus x 2)) 3)
+((Function x (Plus x 1)) ((Function x (Plus x 2) 3)))
+(Attributes Plus)
+((Function x (Plus x 1)) ((Function x (Plus x 2) 3)))
+((Function x (Plus x 1)) ((Function x (Plus x 2) 3 4)))
+((Function x (Plus x 1)) ((Function x (Plus x 2)) 3 4))
+((Function x (Plus x 1)) 2)
+((Function (List a b) (Plus a b)) x y)
+(Set f (Function (List a b) (Plus a b)))
+f
+(f x y)
+(List (f x y) (f z g))
+x
+(Plus 1 1)
+((Function x (x x)) (Function x (x x)))
+((Function x (x x)) 1)

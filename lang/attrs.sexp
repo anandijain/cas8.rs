@@ -24,3 +24,5 @@
 (Set (Attributes Or) (List Flat))
 (Set (Attributes And) (List Flat))
 (Set (Attributes Xor) (List Flat Orderless))
+
+(Set (Attributes Function) (List HoldAll))
