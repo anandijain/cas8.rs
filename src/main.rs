@@ -950,6 +950,7 @@ fn evaluate(ctx: &mut Context2, ex: Expr) -> Expr {
         }
         // step 4
         // If the expression hasn't changed, break the loop.
+        // technically this is supposed to go under the Normal match 
         if Some(&expr) == last.as_ref() {
             break;
         }
@@ -1004,8 +1005,6 @@ fn evaluate(ctx: &mut Context2, ex: Expr) -> Expr {
                         nes.push(ne);
                     }
                 }
-                let mut reconstructed_ex = Expr::normal(nh.clone(), nes.clone());
-                // println!("reconstructed_ex: {}", reconstructed_ex);
 
                 // step 8, Flat splicing
                 let mut new_elements = vec![];
@@ -1046,13 +1045,17 @@ fn evaluate(ctx: &mut Context2, ex: Expr) -> Expr {
 
                 // step 11, Orderless
 
+
+                let mut reconstructed_ex = Expr::normal(nh.clone(), nes.clone());
+                // println!("reconstructed_ex: {}", reconstructed_ex);
+
                 // step 14: apply user defined downvalues and subvalues
                 let exprime = match nh.kind() {
                     // we dont need to panic here "abc"[foo] doesn't
                     ExprKind::Integer(_) | ExprKind::Real(_) | ExprKind::String(_) => {
                         // note: WL doesn't give note in this case
                         println!("head must be a symbol, got {nh}");
-                        return reconstructed_ex;
+                        reconstructed_ex
                     }
                     // this is the down_value case, bcause the head
                     ExprKind::Symbol(_) => {
@@ -1139,14 +1142,12 @@ fn evaluate(ctx: &mut Context2, ex: Expr) -> Expr {
 
                 // note now that ex is not necesarily a List anymore
                 // so if we still have a list, then we do step 15, and apply internal down/subvalues
-
                 match expr.kind() {
                     ExprKind::Normal(_) => {}
                     _ => continue,
                 }
-
                 // println!("{} {}", nh, nes.len());
-                let app = internal_functions_apply(ctx, Expr::normal(nh, nes));
+                let app = internal_functions_apply(ctx, expr);
                 // println!("App {}", app);
                 expr = app;
             }
@@ -1439,7 +1440,7 @@ fn my_match(
             pat = pn.elements()[0].clone();
         }
     }
-    println!("M: {pos:?} | {ex} | {pat} | {pos_map:?} | {named_map:?}");
+    // println!("M: {pos:?} | {ex} | {pat} | {pos_map:?} | {named_map:?}");
 
     match (ex.kind(), pat.kind()) {
         (ExprKind::Normal(e), ExprKind::Normal(p)) => {
@@ -1862,10 +1863,13 @@ mod tests {
     }
 
     #[test]
-    fn test_general() {
+    fn test_function() {
         // testing that the omega combinator actually recurses 
         let s = "((Function x (x x)) (Function x (x x)))";
         assert_eq!(evalparse(s), parse("(TerminatedEvaluation IterationLimit)"));
+        let s = "((Function x (Plus x 1)) 2)";
+        assert_eq!(evalparse(s), parse("3"));
         // "((Function x (x x)) (Function x (x x)))".parse::<Expr>().unwrap();
     }
+
 }

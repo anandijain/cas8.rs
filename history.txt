@@ -465,3 +465,13 @@ x
 (1 1)
 (f 1)
 (1 1)
+(SetDelayed x (Plus x 1))
+x
+(Set 1 x)
+1
+((Function x (Plus x 1)) 2)
+(SameQ 1 1)
+(f (* *hi* *)  x)
+(Table (Times x x) (List 1 10))
+(Table (Times x x) (List x 10))
+((Function x (x x)) (Function x (x x)))
