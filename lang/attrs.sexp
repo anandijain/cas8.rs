@@ -2,7 +2,10 @@
 (Set (Attributes Attributes) (List HoldAll))
 (Set (Attributes RuleDelayed) (List HoldRest SequenceHold))
 (Set (Attributes Set) (List HoldFirst SequenceHold))
+
+(Set (Attributes OwnValues) (List HoldAll))
 (Set (Attributes DownValues) (List HoldAll))
+(Set (Attributes SubValues) (List HoldAll))
 
 (Set (Attributes SetDelayed) (List HoldAll SequenceHold))
 (Set (Attributes Clear) (List HoldAll))

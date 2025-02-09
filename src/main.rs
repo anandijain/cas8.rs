@@ -65,6 +65,10 @@ lazy_static! {
     pub static ref TIMING: Expr = Expr::from(Symbol::new("System`Timing"));
     pub static ref FLAT: Expr = Expr::from(Symbol::new("System`Flat"));
     pub static ref CLEAR: Expr = Expr::from(Symbol::new("System`Clear"));
+    pub static ref OWN_VALUES: Expr = Expr::from(Symbol::new("System`OwnValues"));
+    pub static ref DOWN_VALUES: Expr = Expr::from(Symbol::new("System`DownValues"));
+    pub static ref SUB_VALUES: Expr = Expr::from(Symbol::new("System`SubValues"));
+    pub static ref INFORMATION: Expr = Expr::from(Symbol::new("System`Information"));
 }
 
 #[derive(Helper, Completer, Hinter, Validator)]
@@ -224,7 +228,7 @@ pub struct Context2 {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TableEntry {
-    own: Option<Expr>,
+    own: Expr,
     down: Expr,
     sub: Expr,
 }
@@ -232,7 +236,7 @@ pub struct TableEntry {
 impl TableEntry {
     pub fn new() -> Self {
         Self {
-            own: None,
+            own: Expr::list(vec![]),
             down: Expr::list(vec![]),
             sub: Expr::list(vec![]),
         }
@@ -277,13 +281,16 @@ fn set(ctx: &mut Context2, ex: Expr) -> Expr {
                 // own
                 ExprKind::Symbol(s) => {
                     let mut te = TableEntry::new();
-                    te.own = Some(es[1].clone());
+
+                    let hp = Expr::normal(HOLD_PATTERN.clone(), vec![lhs.clone()]);
+                    let ov = Expr::normal(RULE_DELAYED.clone(), vec![hp, rhs.clone()]);
+                    te.own = Expr::list(vec![ov]);
                     ctx.vars.insert(t.clone().into(), te);
                     // println!("ownvalue: {t:?} | {rhs}");
                     if is_delayed {
                         return Expr::null();
                     }
-                    return es[1].clone();
+                    return rhs.clone();
                 }
                 // down/sub
                 ExprKind::Normal(n) => {
@@ -484,7 +491,7 @@ fn table(ctx: &mut Context2, ex: Expr) -> Expr {
 
         let mut nested_table = table_body.clone();
         for range in range_lists.iter().rev() {
-            let mut new_table = Expr::normal(sym("System`Table"), vec![nested_table.clone()]);
+            let mut new_table = Expr::normal(sym("Table"), vec![nested_table.clone()]);
             new_table = match &mut new_table.kind_mut() {
                 ExprKind::Normal(ref mut v) => {
                     let mut es = v.elements().to_vec();
@@ -733,12 +740,98 @@ pub fn internal_functions_apply(ctx: &mut Context2, ex: Expr) -> Expr {
             return Expr::null();
         } else if h == &*CLEAR {
             return clear(ctx, ex);
+        } else if h == &*INFORMATION {
+            // println!("Information");
+            // println!("{:?}", es);
+            if let ExprKind::String(str_sym) = es[0].kind() {
+                if let Some(te) = ctx.vars.get(&Expr::symbol(Symbol::new(
+                    &format!("System`{}", str_sym).to_string(),
+                ))) {
+                    return info(te);
+                }
+            } else if let ExprKind::Symbol(_) = es[0].kind() {
+                if let Some(te) = ctx.vars.get(&es[0]) {
+                    return info(te);
+                }
+            }
+        } else if h == &*OWN_VALUES {
+            return ownvalues(ctx, es[0].clone());
+        } else if h == &*DOWN_VALUES {
+            return downvalues(ctx, es[0].clone());
+        } else if h == &*SUB_VALUES {
+            return subvalues(ctx, es[0].clone());
         }
     }
     ex
 }
-
 // END INTERNAL
+
+// REFLECTION
+
+fn ownvalues(ctx: &mut Context2, ex: Expr) -> Expr {
+    if let ExprKind::Symbol(s) = ex.kind() {
+        if let Some(te) = ctx.vars.get(&ex) {
+            return te.own.clone();
+            // if let Some(own) = &te.own {
+            //     return own.clone();
+            // }
+        }
+    } else if let ExprKind::String(s) = ex.kind() {
+        if let Some(te) = ctx
+            .vars
+            .get(&Expr::symbol(Symbol::new(&format!("System`{}", &s))))
+        {
+            return te.own.clone();
+        }
+        println!("ownvalues: symbol not found");
+        return Expr::normal(OWN_VALUES.clone(), vec![ex]);
+    }
+    Expr::list(vec![])
+}
+// in this instance the ex is either a str or sym
+fn downvalues(ctx: &mut Context2, ex: Expr) -> Expr {
+    if let ExprKind::Symbol(s) = ex.kind() {
+        if let Some(te) = ctx.vars.get(&ex) {
+            return te.down.clone();
+        }
+    } else if let ExprKind::String(s) = ex.kind() {
+        if let Some(te) = ctx
+            .vars
+            .get(&Expr::symbol(Symbol::new(&format!("System`{}", &s))))
+        {
+            return te.down.clone();
+        }
+        println!("downvalues: symbol not found");
+        return Expr::normal(DOWN_VALUES.clone(), vec![ex]);
+    }
+    Expr::list(vec![])
+}
+
+fn subvalues(ctx: &mut Context2, ex: Expr) -> Expr {
+    if let ExprKind::Symbol(s) = ex.kind() {
+        if let Some(te) = ctx.vars.get(&ex) {
+            return te.sub.clone();
+        }
+    } else if let ExprKind::String(s) = ex.kind() {
+        if let Some(te) = ctx
+            .vars
+            .get(&Expr::symbol(Symbol::new(&format!("System`{}", &s))))
+        {
+            return te.sub.clone();
+        }
+        println!("subvalues: symbol not found");
+        return Expr::normal(SUB_VALUES.clone(), vec![ex]);
+    }
+    Expr::list(vec![])
+}
+
+fn info(te: &TableEntry) -> Expr {
+    let mut res = vec![];
+    res.push(te.own.clone());
+    res.push(te.down.clone());
+    res.push(te.sub.clone());
+    Expr::list(res)
+}
 
 fn head(e: Expr) -> Expr {
     if let Some(h) = e.normal_head() {
@@ -755,7 +848,7 @@ fn head(e: Expr) -> Expr {
 }
 
 fn sym(s: &str) -> Symbol {
-    Symbol::new(s)
+    Symbol::new(&format!("System`{s}"))
 }
 
 fn syme(s: &str) -> Expr {
@@ -847,7 +940,14 @@ fn evaluate(ctx: &mut Context2, ex: Expr) -> Expr {
     let mut expr = ex.clone();
     let mut last = None;
     // println!("Evaluating {}", expr);
+    let mut iter = -1;
+
     loop {
+        iter += 1;
+        if iter > 4096 {
+            println!("Evaluation loop exceeded 4096 iterations");
+            return Expr::normal(syme("TerminatedEvaluation"), vec![syme("IterationLimit")]);
+        }
         // step 4
         // If the expression hasn't changed, break the loop.
         if Some(&expr) == last.as_ref() {
@@ -856,6 +956,12 @@ fn evaluate(ctx: &mut Context2, ex: Expr) -> Expr {
         last = Some(expr.clone());
 
         match expr.kind() {
+            // step 2
+            ExprKind::Symbol(s) => {
+                if let Some(te) = ctx.vars.get(&s.clone().into()) {
+                    expr = replace_all(&expr, &te.own);
+                }
+            }
             ExprKind::Normal(n) => {
                 let (h, es) = (n.head(), n.elements());
                 // step 5
@@ -970,8 +1076,7 @@ fn evaluate(ctx: &mut Context2, ex: Expr) -> Expr {
                             .or_insert_with(TableEntry::new);
                         let svs = &te.sub;
                         // println!("looking for user defined sub_values for {} -> {}. tag {} new_elements {:?}", nh, svs, tag.clone(), nes.clone());
-                        if tag.clone() == sym("System`Function") {
-
+                        if tag.clone() == sym("Function") {
                             // the args to the anon f is nes
                             // len(nes) must be equal to len nh[1]
                             // what i want
@@ -1012,7 +1117,8 @@ fn evaluate(ctx: &mut Context2, ex: Expr) -> Expr {
                             // println!("tag is func. body: {}", body);
                             let rules_expr = Expr::list(rules);
                             // println!("rules_expr: {}", rules_expr.clone());
-                            reconstructed_ex = replace_all(body , &rules_expr);
+                            reconstructed_ex = replace_all(body, &rules_expr);
+                            last = None;
                             // println!("reconstructed_ex: {}", reconstructed_ex.clone());
                         }
                         // should this be replace_all? or replace_repeated?
@@ -1044,24 +1150,14 @@ fn evaluate(ctx: &mut Context2, ex: Expr) -> Expr {
                 // println!("App {}", app);
                 expr = app;
             }
-            ExprKind::Symbol(s) => {
-                if let Some(te) = ctx.vars.get(&s.clone().into()) {
-                    if let Some(own) = &te.own {
-                        expr = own.clone();
-                    }
-                    //  else {
-                    //     expr = te.down.clone();
-                    // }
-                }
-                //  else {
-                //     expr = expr.into();
-                // }
-            }
+
             _ => {}
         }
     }
     expr
 }
+/// END EVALUATE()
+
 
 pub fn bindings_to_rules(bindings: &HashMap<String, Expr>) -> Expr {
     let mut es = vec![];
@@ -1079,7 +1175,7 @@ pub fn pat_bindings_to_rules(bindings: &HashMap<Expr, Expr>) -> Expr {
     for (pat, binding) in bindings.clone() {
         if let ExprKind::Normal(ps) = pat.kind() {
             let (psh, pses) = (ps.head(), ps.elements());
-            assert_eq!(psh.clone(), syme("System`Pattern"));
+            assert_eq!(psh.clone(), syme("Pattern"));
             let r = Expr::rule(pses[0].clone(), binding.clone());
             es.push(r);
         }
@@ -1096,7 +1192,7 @@ pub fn norm_rules(rules: &Expr) -> Vec<Expr> {
             assert_eq!(rh, *LIST);
             return rn.clone().into_elements();
         } else {
-            panic!("non Normal rules ya bish")
+            panic!("non Normal rules ya bish {}", rules);
         }
     };
 }
@@ -1238,7 +1334,7 @@ fn pos_map_rebuild(
                 new_pos.push(pos_in_list as usize);
                 let new_e = pos_map_rebuild(new_pos, e.clone(), pos_map, use_offset);
                 if let ExprKind::Normal(n) = new_e.kind() {
-                    if n.head() == &syme("System`Sequence") {
+                    if n.head() == &syme("Sequence") {
                         let ne = n.elements().len();
                         // zero is because we special cased empty seqs to not splice
                         if ne == 0 {
@@ -1293,7 +1389,7 @@ fn splice_sequences(expr: Expr, use_offset: bool) -> Expr {
             for ne in new_es {
                 if let ExprKind::Normal(n) = ne.kind() {
                     let (h, es) = (n.head(), n.elements());
-                    if h == &sym("System`Sequence") {
+                    if h == &sym("Sequence") {
                         if !use_offset && es.is_empty() {
                             new.push(ne);
                             continue;
@@ -1343,7 +1439,7 @@ fn my_match(
             pat = pn.elements()[0].clone();
         }
     }
-    // println!("M: {pos:?} | {ex} | {pat} | {pos_map:?} | {named_map:?}");
+    println!("M: {pos:?} | {ex} | {pat} | {pos_map:?} | {named_map:?}");
 
     match (ex.kind(), pat.kind()) {
         (ExprKind::Normal(e), ExprKind::Normal(p)) => {
@@ -1414,7 +1510,7 @@ fn my_match(
                                 };
 
                                 for j in bounds {
-                                    let mut elts = vec![syme("System`Sequence")];
+                                    let mut elts = vec![syme("Sequence")];
                                     // now we build up the elements of the Sequence
                                     // which start at index i and go to i+j
 
@@ -1505,7 +1601,7 @@ fn my_match(
                         };
 
                         for j in bounds {
-                            let mut elts = vec![syme("System`Sequence")];
+                            let mut elts = vec![syme("Sequence")];
                             // now we build up the elements of the Sequence
                             // which start at index i and go to i+j
 
@@ -1765,5 +1861,11 @@ mod tests {
         // }
     }
 
-    #[]
+    #[test]
+    fn test_general() {
+        // testing that the omega combinator actually recurses 
+        let s = "((Function x (x x)) (Function x (x x)))";
+        assert_eq!(evalparse(s), parse("(TerminatedEvaluation IterationLimit)"));
+        // "((Function x (x x)) (Function x (x x)))".parse::<Expr>().unwrap();
+    }
 }
