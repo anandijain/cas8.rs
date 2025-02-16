@@ -69,6 +69,7 @@ lazy_static! {
     pub static ref DOWN_VALUES: Expr = Expr::from(Symbol::new("System`DownValues"));
     pub static ref SUB_VALUES: Expr = Expr::from(Symbol::new("System`SubValues"));
     pub static ref INFORMATION: Expr = Expr::from(Symbol::new("System`Information"));
+    pub static ref APPLY: Expr = Expr::from(Symbol::new("System`Apply"));
 }
 
 #[derive(Helper, Completer, Hinter, Validator)]
@@ -760,6 +761,15 @@ pub fn internal_functions_apply(ctx: &mut Context2, ex: Expr) -> Expr {
             return downvalues(ctx, es[0].clone());
         } else if h == &*SUB_VALUES {
             return subvalues(ctx, es[0].clone());
+        } else if h == &*APPLY {
+            let f = es[0].clone();
+            let expr = es[1].clone();
+            if let ExprKind::Normal(nex) = expr.kind() {
+                let (_, exes) = (nex.head(), nex.elements());
+                return Expr::normal(f, exes.to_vec());
+            } else {
+                return expr;
+            }
         }
     }
     ex
@@ -950,7 +960,7 @@ fn evaluate(ctx: &mut Context2, ex: Expr) -> Expr {
         }
         // step 4
         // If the expression hasn't changed, break the loop.
-        // technically this is supposed to go under the Normal match 
+        // technically this is supposed to go under the Normal match
         if Some(&expr) == last.as_ref() {
             break;
         }
@@ -1044,7 +1054,6 @@ fn evaluate(ctx: &mut Context2, ex: Expr) -> Expr {
                 // step 10, Listable
 
                 // step 11, Orderless
-
 
                 let mut reconstructed_ex = Expr::normal(nh.clone(), nes.clone());
                 // println!("reconstructed_ex: {}", reconstructed_ex);
@@ -1158,7 +1167,6 @@ fn evaluate(ctx: &mut Context2, ex: Expr) -> Expr {
     expr
 }
 /// END EVALUATE()
-
 
 pub fn bindings_to_rules(bindings: &HashMap<String, Expr>) -> Expr {
     let mut es = vec![];
@@ -1864,12 +1872,24 @@ mod tests {
 
     #[test]
     fn test_function() {
-        // testing that the omega combinator actually recurses 
+        // testing that the omega combinator actually recurses
         let s = "((Function x (x x)) (Function x (x x)))";
         assert_eq!(evalparse(s), parse("(TerminatedEvaluation IterationLimit)"));
         let s = "((Function x (Plus x 1)) 2)";
         assert_eq!(evalparse(s), parse("3"));
         // "((Function x (x x)) (Function x (x x)))".parse::<Expr>().unwrap();
     }
+    
+    #[test]
+    fn test_internal() {
+        let cases = vec![
+            ("(Apply (x y) z)", "z"),
+            ("(Apply (x y) (z a))", "((x y) a)"),
+        ];
 
+        for (i, (c, e)) in cases.iter().enumerate() {
+            println!("\n\nSTARTING MATCH CASE {}: {}", i, c);
+            assert_eq!(evalparse(c), parse(e))
+        }
+    }
 }

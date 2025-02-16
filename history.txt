@@ -475,3 +475,4 @@ x
 (Table (Times x x) (List 1 10))
 (Table (Times x x) (List x 10))
 ((Function x (x x)) (Function x (x x)))
+(Apply (x y) (z a))
