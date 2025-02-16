@@ -65,6 +65,7 @@ lazy_static! {
     pub static ref TIMING: Expr = Expr::from(Symbol::new("System`Timing"));
     pub static ref FLAT: Expr = Expr::from(Symbol::new("System`Flat"));
     pub static ref CLEAR: Expr = Expr::from(Symbol::new("System`Clear"));
+    pub static ref APPLY: Expr = Expr::from(Symbol::new("System`Apply"));
 }
 
 #[derive(Helper, Completer, Hinter, Validator)]
@@ -733,6 +734,15 @@ pub fn internal_functions_apply(ctx: &mut Context2, ex: Expr) -> Expr {
             return Expr::null();
         } else if h == &*CLEAR {
             return clear(ctx, ex);
+        } else if h == &*APPLY {
+            let f = es[0].clone();
+            let expr = es[1].clone();
+            if let ExprKind::Normal(nex) = expr.kind() {
+                let (_, exes) = (nex.head(), nex.elements());
+                return Expr::normal(f, exes.to_vec());
+            } else {
+                return expr;
+            }
         }
     }
     ex
@@ -846,6 +856,7 @@ fn get_attributes(ctx: &mut Context2, nh: Expr) -> Expr {
 fn evaluate(ctx: &mut Context2, ex: Expr) -> Expr {
     let mut expr = ex.clone();
     let mut last = None;
+    let mut iter = 0;
     // println!("Evaluating {}", expr);
     loop {
         // step 4
@@ -971,7 +982,6 @@ fn evaluate(ctx: &mut Context2, ex: Expr) -> Expr {
                         let svs = &te.sub;
                         // println!("looking for user defined sub_values for {} -> {}. tag {} new_elements {:?}", nh, svs, tag.clone(), nes.clone());
                         if tag.clone() == sym("System`Function") {
-
                             // the args to the anon f is nes
                             // len(nes) must be equal to len nh[1]
                             // what i want
@@ -1009,11 +1019,15 @@ fn evaluate(ctx: &mut Context2, ex: Expr) -> Expr {
                                 return FAILED.clone();
                             }
                             let body = nh.normal_part(1).unwrap();
-                            // println!("tag is func. body: {}", body);
+                            println!("tag is func. body: {}", body);
                             let rules_expr = Expr::list(rules);
-                            // println!("rules_expr: {}", rules_expr.clone());
-                            reconstructed_ex = replace_all(body , &rules_expr);
-                            // println!("reconstructed_ex: {}", reconstructed_ex.clone());
+                            println!("rules_expr: {}", rules_expr.clone());
+                            // reconstructed_ex = replace_all(body , &rules_expr);
+                            let ra_args = vec![body.clone(), rules_expr.clone()];
+                            reconstructed_ex =
+                                Expr::normal(Symbol::new("System`ReplaceAll"), ra_args);
+                            println!("reconstructed_ex: {}", reconstructed_ex.clone());
+                            // reconstructed_ex = evaluate(, reconstructed_ex);
                         }
                         // should this be replace_all? or replace_repeated?
                         let exprime = replace_all(&reconstructed_ex, svs);
@@ -1765,5 +1779,16 @@ mod tests {
         // }
     }
 
-    #[]
+    #[test]
+    fn test_internal() {
+        let cases = vec![
+            ("(Apply (x y) z)", "z"),
+            ("(Apply (x y) (z a))", "((x y) a)")
+        ];
+
+        for (i, (c, e)) in cases.iter().enumerate() {
+            println!("\n\nSTARTING MATCH CASE {}: {}", i, c);
+            assert_eq!(evalparse(c), parse(e))
+        }
+    }
 }
