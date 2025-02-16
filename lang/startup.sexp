@@ -41,3 +41,9 @@
 (SetDelayed (First (Pattern xs (BlankNullSequence))) (First (List xs)))
 (SetDelayed (Rest (List (Blank) (Pattern rest (BlankNullSequence)))) (List rest))
 (SetDelayed (Rest (Pattern xs (BlankNullSequence))) (Rest (List xs)))
+
+(SetDelayed (Plus) 0)
+(SetDelayed (Plus (Pattern x (Blank))) x)
+
+(SetDelayed (Times) 1)
+(SetDelayed (Times (Pattern x (Blank))) x)

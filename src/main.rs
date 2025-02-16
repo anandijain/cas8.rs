@@ -655,21 +655,9 @@ pub fn internal_functions_apply(ctx: &mut Context2, ex: Expr) -> Expr {
         let (h, es) = (n.head(), n.elements());
         // right now these basic arithmetic ops aren't variadic
         if h == &Expr::symbol(Symbol::new("System`Plus")) {
-            // println!("Plus");
-            if let (ExprKind::Integer(a), ExprKind::Integer(b)) = (es[0].kind(), es[1].kind()) {
-                let ret = Expr::from(a + b);
-                // println!("Integers reutrning {}", ret);
-                return ret;
-            }
-            return ex.into();
+            return evaluate_plus(es)
         } else if h == &Expr::symbol(Symbol::new("System`Times")) {
-            // println!("Plus");
-            if let (ExprKind::Integer(a), ExprKind::Integer(b)) = (es[0].kind(), es[1].kind()) {
-                let ret = Expr::from(a * b);
-                // println!("Integers reutrning {}", ret);
-                return ret;
-            }
-            return ex.into();
+            return evaluate_times(es)
         } else if h == &Expr::symbol(Symbol::new("System`MatchQ")) {
             return my_match(
                 es[0].clone(),
@@ -774,6 +762,91 @@ pub fn internal_functions_apply(ctx: &mut Context2, ex: Expr) -> Expr {
     }
     ex
 }
+
+// Evaluate a variadic Plus expression.
+// Sums up integer literals and collects like terms,
+// replacing repeated terms with a Times construction.
+fn evaluate_plus(es: &[Expr]) -> Expr {
+    let mut int_sum = 0;
+    let mut term_counts: HashMap<Expr, i32> = HashMap::new();
+    
+    for arg in es {
+        match arg.kind() {
+            ExprKind::Integer(n) => {
+                int_sum += n;
+            }
+            _ => {
+                *term_counts.entry(arg.clone()).or_insert(0) += 1;
+            }
+        }
+    }
+    
+    let mut new_args = Vec::new();
+    if int_sum != 0 {
+        new_args.push(Expr::from(int_sum));
+    }
+    
+    for (term, count) in term_counts {
+        if count > 1 {
+            // e.g. a+a becomes Times[2, a]
+            new_args.push(Expr::normal(
+                Expr::symbol(Symbol::new("System`Times")),
+                vec![Expr::from(count), term],
+            ));
+        } else {
+            new_args.push(term);
+        }
+    }
+    
+    if new_args.len() == 1 {
+        new_args.pop().unwrap()
+    } else {
+        Expr::normal(Expr::symbol(Symbol::new("System`Plus")), new_args)
+    }
+}
+
+// Evaluate a variadic Times expression.
+// Multiplies integer literals and collects like factors,
+// replacing repeated factors with a Power construction.
+fn evaluate_times(es: &[Expr]) -> Expr {
+    let mut int_product = 1;
+    let mut factor_counts: HashMap<Expr, i32> = HashMap::new();
+    
+    for arg in es {
+        match arg.kind() {
+            ExprKind::Integer(n) => {
+                int_product *= n;
+            }
+            _ => {
+                *factor_counts.entry(arg.clone()).or_insert(0) += 1;
+            }
+        }
+    }
+    
+    let mut new_args = Vec::new();
+    if int_product != 1 {
+        new_args.push(Expr::from(int_product));
+    }
+    
+    for (factor, count) in factor_counts {
+        if count > 1 {
+            // e.g. a*a becomes Power[a, 2]
+            new_args.push(Expr::normal(
+                Expr::symbol(Symbol::new("System`Power")),
+                vec![factor, Expr::from(count)],
+            ));
+        } else {
+            new_args.push(factor);
+        }
+    }
+    
+    if new_args.len() == 1 {
+        new_args.pop().unwrap()
+    } else {
+        Expr::normal(Expr::symbol(Symbol::new("System`Times")), new_args)
+    }
+}
+
 // END INTERNAL
 
 // REFLECTION
@@ -1879,7 +1952,7 @@ mod tests {
         assert_eq!(evalparse(s), parse("3"));
         // "((Function x (x x)) (Function x (x x)))".parse::<Expr>().unwrap();
     }
-    
+
     #[test]
     fn test_internal() {
         let cases = vec![
