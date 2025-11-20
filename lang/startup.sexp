@@ -47,3 +47,6 @@
 
 (SetDelayed (Times) 1)
 (SetDelayed (Times (Pattern x (Blank))) x)
+
+(* not strictly correct but did work for what i needed *)
+(SetDelayed (MapApply f xs) (Map (Function x (Apply f x)) xs))
