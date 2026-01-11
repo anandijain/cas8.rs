@@ -48,5 +48,8 @@
 (SetDelayed (Times) 1)
 (SetDelayed (Times (Pattern x (Blank))) x)
 
+(SetDelayed (Subtract (Pattern x (Blank)) (Pattern y (Blank))) (Plus x (Times -1 y)))
+(SetDelayed (Divide (Pattern x (Blank)) (Pattern y (Blank))) (Times x (Power y -1)))
+
 (* not strictly correct but did work for what i needed *)
-(SetDelayed (MapApply f xs) (Map (Function x (Apply f x)) xs))
+(SetDelayed (MapApply (Pattern f (Blank)) (Pattern xs (Blank))) (Map (Function x (Apply f x)) xs))

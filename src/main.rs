@@ -41,6 +41,8 @@ lazy_static! {
     pub static ref MATCHQ: Expr = Expr::from(Symbol::new("System`MatchQ"));
     pub static ref HEAD: Expr = Expr::from(Symbol::new("System`Head"));
     pub static ref PLUS: Expr = Expr::from(Symbol::new("System`Plus"));
+    pub static ref TIMES: Expr = Expr::from(Symbol::new("System`Times"));
+    pub static ref POWER: Expr = Expr::from(Symbol::new("System`Power"));
     pub static ref SET: Expr = Expr::from(Symbol::new("System`Set"));
     pub static ref SET_DELAYED: Expr = Expr::from(Symbol::new("System`SetDelayed"));
     pub static ref RULE_DELAYED: Expr = Expr::from(Symbol::new("System`RuleDelayed"));
@@ -70,6 +72,7 @@ lazy_static! {
     pub static ref SUB_VALUES: Expr = Expr::from(Symbol::new("System`SubValues"));
     pub static ref INFORMATION: Expr = Expr::from(Symbol::new("System`Information"));
     pub static ref APPLY: Expr = Expr::from(Symbol::new("System`Apply"));
+    pub static ref COMPOUND_EXPRESSION: Expr = Expr::from(Symbol::new("System`CompoundExpression"));
 }
 
 #[derive(Helper, Completer, Hinter, Validator)]
@@ -655,9 +658,9 @@ pub fn internal_functions_apply(ctx: &mut Context2, ex: Expr) -> Expr {
         let (h, es) = (n.head(), n.elements());
         // right now these basic arithmetic ops aren't variadic
         if h == &Expr::symbol(Symbol::new("System`Plus")) {
-            return evaluate_plus(es)
-        } else if h == &Expr::symbol(Symbol::new("System`Times")) {
-            return evaluate_times(es)
+            return evaluate_plus(es);
+        } else if h == &*TIMES {
+            return evaluate_times(es);
         } else if h == &Expr::symbol(Symbol::new("System`MatchQ")) {
             return my_match(
                 es[0].clone(),
@@ -758,7 +761,24 @@ pub fn internal_functions_apply(ctx: &mut Context2, ex: Expr) -> Expr {
             } else {
                 return expr;
             }
+        } else if h == &*COMPOUND_EXPRESSION {
+            let mut res = None;
+            for e in es {
+                res = Some(evaluate(ctx, e.clone()));
+            }
+            return res.unwrap();
         }
+        //
+        // else if h == &*POWER{
+        //     // if ExprKind::Integer(())
+        //     if let ExprKind::Integer(x) = es[0].kind() {
+        //         if let ExprKind::Integer(y) = es[1].kind() {
+        //             return Expr::number(Number::Integer(x.pow(y)))
+        //             // i64::pow()
+        //         }
+        //     }
+        //     return ex;
+        // }
     }
     ex
 }
@@ -769,7 +789,7 @@ pub fn internal_functions_apply(ctx: &mut Context2, ex: Expr) -> Expr {
 fn evaluate_plus(es: &[Expr]) -> Expr {
     let mut int_sum = 0;
     let mut term_counts: HashMap<Expr, i32> = HashMap::new();
-    
+
     for arg in es {
         match arg.kind() {
             ExprKind::Integer(n) => {
@@ -780,12 +800,12 @@ fn evaluate_plus(es: &[Expr]) -> Expr {
             }
         }
     }
-    
+
     let mut new_args = Vec::new();
     if int_sum != 0 {
         new_args.push(Expr::from(int_sum));
     }
-    
+
     for (term, count) in term_counts {
         if count > 1 {
             // e.g. a+a becomes Times[2, a]
@@ -797,7 +817,7 @@ fn evaluate_plus(es: &[Expr]) -> Expr {
             new_args.push(term);
         }
     }
-    
+
     if new_args.len() == 1 {
         new_args.pop().unwrap()
     } else {
@@ -811,7 +831,7 @@ fn evaluate_plus(es: &[Expr]) -> Expr {
 fn evaluate_times(es: &[Expr]) -> Expr {
     let mut int_product = 1;
     let mut factor_counts: HashMap<Expr, i32> = HashMap::new();
-    
+
     for arg in es {
         match arg.kind() {
             ExprKind::Integer(n) => {
@@ -822,12 +842,12 @@ fn evaluate_times(es: &[Expr]) -> Expr {
             }
         }
     }
-    
+
     let mut new_args = Vec::new();
     if int_product != 1 {
         new_args.push(Expr::from(int_product));
     }
-    
+
     for (factor, count) in factor_counts {
         if count > 1 {
             // e.g. a*a becomes Power[a, 2]
@@ -839,7 +859,7 @@ fn evaluate_times(es: &[Expr]) -> Expr {
             new_args.push(factor);
         }
     }
-    
+
     if new_args.len() == 1 {
         new_args.pop().unwrap()
     } else {
