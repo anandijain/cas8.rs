@@ -53,3 +53,11 @@
 
 (* not strictly correct but did work for what i needed *)
 (SetDelayed (MapApply (Pattern f (Blank)) (Pattern xs (Blank))) (Map (Function x (Apply f x)) xs))
+
+(SetDelayed (Range (Pattern i (Blank Integer)) (Pattern j (Blank Integer))) (Table n (List n i j)))
+(SetDelayed (Range (Pattern j (Blank Integer))) (Table n (List n 1 j)))
+
+(SetDelayed (Total (Pattern xs (Blank List))) (Apply Plus xs))
+
+(* the weird argument to the lambda is a limitation of my `Function` not handling shadowing and captures *)
+(SetDelayed (Norm (Pattern xs (Blank List))) (Sqrt (Total (Map (Function sqarg (Power sqarg 2)) xs))))

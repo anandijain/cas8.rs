@@ -500,7 +500,7 @@ x
 (Set (f b a) b)
 (Set (f b b) b)
 (Set (g a) c)
-(Set (g b) d)
+(Set (g b) d) 
 (f (g a) (g b))
 SameQ a a
 (SameQ a a)
@@ -514,5 +514,46 @@ SetDelayed
 (Apply f tab (List 1))
 ((Function x x) y)
 (Map (Function x (Apply f x)) tab)
-(SetDelayed (MapApply f xs) (Map (Function x (Apply f x)) xs))
+(SetDelayed (MapApply (Blank f) (Blank xs)) (Map (Function x (Apply f x)) xs))
 (* hi*)
+(Set (h c c) d)
+(Set (h c d) d) 
+(Set (h d c) c)
+(Apply g (f x))
+(CompoundExpression (Set x 1) (Plus x 1))
+(SetDelayed (f (charge (Pattern q1 (Blank)) (Pattern r1 (Blank)))\n(charge (Pattern q2 (Blank)) (Pattern r2 (Blank)))) (Times k q1 q2 (Subtract r2 r1)))
+(Information MatchQ)
+(Information "MatchQ")
+(Information Map)
+(Set (f (Blank)) 2)
+(Information f)
+(Set SKRules (List (Rule (((s (Pattern x (Blank))) (Pattern y (Blank))) (Pattern z (Blank))) ((x z) (y z))) (Rule ((k (Pattern x (Blank))) (Pattern y (Blank))) x)))
+(set Succ (s ((s (k s)) k)))\n
+(Set Succ (s ((s (k s)) k)))\n
+(Nest succ (s k) 10)
+(Nest Succ (s k) 10)\n
+(Set foo (Nest Succ (s k) 10))\n
+foo
+(ReplaceRepeated foo SKRules)\n
+(ReplaceRepeated (((Nest Succ (s k) 10) s) k) SKRules)\n
+foo
+(ReplaceRepeated ((foo s) k) SKRules)\n
+(SetDelayed (skn (Pattern n (Blank Integer))) (Nest Succ (s k) n))\n
+(skn 10)
+(((skn 10) s) k)
+(rr (((skn 10) s) k) SKRules)
+(Set rr ReplaceRepeated)
+(rr (((skn 10) s) k) SKRules)
+(* Computing with Combinators *)\n(* First we define the sk rules *)\n(Set SKRules (List (Rule (((s (Pattern x (Blank))) (Pattern y (Blank))) (Pattern z (Blank))) ((x z) (y z))) (Rule ((k (Pattern x (Blank))) (Pattern y (Blank))) x)))\n\n(* now we define the rule for incrementing *)\n(Set Succ (s ((s (k s)) k)))\n\n(* now we apply succ to (s k) 10 times *)\n(Set foo (Nest Succ (s k) 10))\n\n(* now we apply [s][k] to the result and do fixed-point replacement using our SK-rules *)\n(ReplaceRepeated ((foo s) k) SKRules)\n\n(* you should see: *)\n(* (s (s (s (s (s (s (s (s (s (s k)))))))))) *)\n\n(* now we define a helper function to get an sk representation of a Natural number *)\n(SetDelayed (SKn (Pattern n (Blank Integer))) (Nest Succ (s k) n))\n\n(* it turns out the following is the sk representation of plus *)\n(* in the future i would like to do a search to find this  *)\n(Set SKPlus ((s (k s)) (s (k ((s (k s)) k)))))\n\n(* so now we can compute 60 + 9 using sk_plus *)\n(ReplaceRepeated ((((SKPlus (SKn 60)) (SKn 9)) s) k) SKRules)
+(Factorial 3)
+(SetDelayed (f (Pattern x (Blank)) (Pattern y (Blank)))\n(CompoundExpression (Set z (Power x 2)) (Plus z y)))
+(f 2 3)
+(f 4 3)
+(Power 3 3)
+(Divide 2 3)
+(SetDelayed (Divide (Pattern x (Blank)) (Pattern y (Blank))) (Times x (Power y -1)))\n
+(Divide 2 3)
+(Power 3 -1)
+(Divide 2 3)
+(Rational 2 3) 
+(Power 2 3)

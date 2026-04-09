@@ -26,7 +26,7 @@ use std::ops::{Deref, DerefMut};
 use std::time::{Duration, Instant};
 use std::{fmt, path::Path};
 
-use wolfram_expr::{Expr, ExprKind, Symbol};
+use wolfram_expr::{Expr, ExprKind, Number, Symbol};
 
 lazy_static! {
     pub static ref BLANK: Expr = Expr::from(Symbol::new("System`Blank"));
@@ -767,18 +767,16 @@ pub fn internal_functions_apply(ctx: &mut Context2, ex: Expr) -> Expr {
                 res = Some(evaluate(ctx, e.clone()));
             }
             return res.unwrap();
+        } else if h == &*POWER {
+            // if ExprKind::Integer(())
+            if let ExprKind::Integer(x) = es[0].kind() {
+                if let ExprKind::Integer(y) = es[1].kind() {
+                    let exp: u32 = (*y).try_into().unwrap();
+                    return Expr::number(Number::Integer(x.pow(exp)));
+                }
+            }
+            return ex;
         }
-        //
-        // else if h == &*POWER{
-        //     // if ExprKind::Integer(())
-        //     if let ExprKind::Integer(x) = es[0].kind() {
-        //         if let ExprKind::Integer(y) = es[1].kind() {
-        //             return Expr::number(Number::Integer(x.pow(y)))
-        //             // i64::pow()
-        //         }
-        //     }
-        //     return ex;
-        // }
     }
     ex
 }
