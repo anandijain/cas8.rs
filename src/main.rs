@@ -1838,6 +1838,7 @@ fn main() -> Result<()> {
     let startup_strs = vec![
         include_str!("../lang/attrs.sexp"),
         include_str!("../lang/startup.sexp"),
+        include_str!("../lang/calculus.sexp"),
         // include_str!("../lang/aliases.sexp"),
     ];
 
