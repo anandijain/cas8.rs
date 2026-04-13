@@ -61,3 +61,22 @@
 
 (* the weird argument to the lambda is a limitation of my `Function` not handling shadowing and captures *)
 (SetDelayed (Norm (Pattern xs (Blank List))) (Sqrt (Total (Map (Function sqarg (Power sqarg 2)) xs))))
+
+(SetDelayed 
+    (Cross (List 
+        (Pattern a1 (Blank)) 
+        (Pattern a2 (Blank))
+        (Pattern a3 (Blank)))
+    (List 
+        (Pattern b1 (Blank)) 
+        (Pattern b2 (Blank)) 
+        (Pattern b3 (Blank))))
+(List 
+    (Subtract (Times a2 b3) (Times a3 b2)) 
+    (Times -1 (Subtract (Times a1 b3) (Times a3 b1))) 
+    (Subtract (Times a1 b2) (Times a2 b1))))
+
+(SetDelayed (Times 0 (BlankNullSequence)) 0)
+(SetDelayed (Plus 0 (Pattern x (Blank))) x)
+
+(SetDelayed (Minus (Pattern x (Blank))) (Times -1 x))
